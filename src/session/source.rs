@@ -37,4 +37,6 @@ impl Source {
     }
 }
 
-pub struct SourceMap(pub Vec<Source>);
+pub struct SourceMap {
+    pub sources: Vec<Source>,
+}
