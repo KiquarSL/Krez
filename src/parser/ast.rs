@@ -2,15 +2,16 @@ use super::expr::Expr;
 use super::types::Type;
 use strum::Display;
 
+#[derive(Debug)]
 pub enum Stmt {
     Declare(String, Type, Expr),
     Assign(String, AssignOp, Expr),
     While(Expr, Vec<Stmt>),
-    Func(Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
+    Func(String, Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
     Expr(Expr),
 }
 
-#[derive(Default, Display)]
+#[derive(Debug, Default, Display)]
 pub enum AssignOp {
     #[default]
     #[strum(to_string = "=")]

@@ -15,6 +15,12 @@ pub enum TokenKind {
     Slash,
     #[strum(to_string = "!")]
     Bang,
+    #[strum(to_string = ",")]
+    Comma,
+    #[strum(to_string = ".")]
+    Dot,
+    #[strum(to_string = ":")]
+    Colon,
 
     #[strum(to_string = "=")]
     Assign,

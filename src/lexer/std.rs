@@ -174,10 +174,10 @@ impl<'a> Lexer for StdLexer<'a> {
                     let mut buffer = String::new();
                     while self.valid_pos() {
                         let current = self.peek(0);
-                        self.advance(1);
                         if let Some(ch) = current {
                             if ch.is_alphabetic() || ch.is_digit(10) || ch == '_' {
                                 buffer.push(ch);
+                                self.advance(1);
                             } else {
                                 break;
                             }

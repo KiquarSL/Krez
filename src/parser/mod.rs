@@ -18,6 +18,14 @@ pub struct Info {
     pub len: usize,
 }
 
+use core::fmt;
+
+impl fmt::Display for Info {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}, {}, {}", self.line, self.offset, self.len)
+    }
+}
+
 #[macro_export]
 macro_rules! info {
     ($line:expr, $offset:expr, $len:expr) => {
