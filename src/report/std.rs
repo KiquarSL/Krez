@@ -1,5 +1,6 @@
 use super::{Diagnostic, Help, Level};
 use crate::session::source::SourceMap;
+use colored::*;
 
 pub struct StdReporter {
     verbose: Verbose,
@@ -12,34 +13,42 @@ impl super::Reporter for StdReporter {
         }
         let span = &diag.span;
         let prefix = match diag.level {
-            Level::Warn => "Warn",
-            Level::Error => "Error",
+            Level::Warn => "Warn".yellow(),
+            Level::Error => "Error".red(),
         };
-        println!("\x1b[33m{prefix}: {}\x1b[0m", diag.message);
+        println!("{prefix}: {}", diag.message);
         if self.verbose == Verbose::Dev {
             println!("Phase: {}", diag.phase);
         }
         println!(
-            "\x1b[32m--> {} in {}:{}\x1b[0m",
-            source_map.sources[span.id].name,
-            span.line + 1,
-            span.offset
+            "{}",
+            format!(
+                "--> {} in {}:{}",
+                source_map.sources[span.id].name,
+                span.line + 1,
+                span.offset + 1
+            )
+            .blue()
         );
         println!("{}", Self::build_diag(diag, source_map));
         if self.verbose < Verbose::Verbose {
             return;
         }
         for note in &diag.notes {
-            println!("\x1b[32mNote:\x1b[0m {}", note);
+            println!("{}", format!("Note: {note}").blue());
         }
         for help in &diag.helps {
-            println!("\x1b[32mHelp:\x1b[0m {}", help.message);
+            println!("{}", format!("Help: {}", help.message).blue());
             println!("{}", Self::build_help(help, source_map));
         }
     }
 }
 
 impl StdReporter {
+    pub fn new(verbose: Verbose) -> Self {
+        Self { verbose }
+    }
+
     fn build_diag(diag: &Diagnostic, source_map: &SourceMap) -> String {
         let span = &diag.span;
         let code_line = source_map.sources[span.id].get_line(span.line);
@@ -47,9 +56,9 @@ impl StdReporter {
 
         let padd1 = " ".repeat(span.line.to_string().len());
         let padd2 = " ".repeat(span.offset);
-        let points = "^".repeat(span.len);
+        let points = "^".repeat(span.len).yellow();
         let points_line = format!("{padd1} | {padd2}{points}");
-        format!("{code_line}\n\x1b[34m{points_line}\x1b[0m")
+        format!("{code_line}\n{points_line}")
     }
 
     fn build_help(help: &Help, source_map: &SourceMap) -> String {
@@ -60,9 +69,9 @@ impl StdReporter {
         let code_line = format!("{} | {code_line}", span.line + 1);
         let padd1 = " ".repeat(span.line.to_string().len());
         let padd2 = " ".repeat(span.offset);
-        let points = "+".repeat(help.fixed.len());
+        let points = "+".repeat(help.fixed.len()).blue();
         let points_line = format!("{padd1} | {padd2}{points}");
-        format!("{code_line}\n\x1b[34m{points_line}\x1b[0m")
+        format!("{code_line}\n{points_line}")
     }
 }
 

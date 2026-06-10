@@ -40,3 +40,14 @@ impl Source {
 pub struct SourceMap {
     pub sources: Vec<Source>,
 }
+
+impl SourceMap {
+    pub fn new() -> Self {
+        Self { sources: vec![] }
+    }
+
+    pub fn add(&mut self, name: impl Into<String>, text: impl Into<String>) -> usize {
+        self.sources.push(Source::new(name.into(), text.into()));
+        self.sources.len() - 1
+    }
+}

@@ -10,20 +10,10 @@ pub trait Reporter {
 #[macro_export]
 macro_rules! span {
     ($id:expr, $line:expr, $offset:expr, $len:expr) => {
-        $crate::report::Span {
-            $id,
-            $line,
-            $offset,
-            $len,
-        }
+        $crate::report::Span::new($id, $line, $offset, $len)
     };
-	($id:expr, $token:expr) => {
-        $crate::report::Span {
-            $id,
-            $token.line,
-            $token.offset,
-            $token.len,
-        }
+    ($id:expr, $token:expr) => {
+        $crate::span!($id, $token.line, $token.offset, $token.len)
     };
 }
 #[macro_export]
@@ -36,10 +26,11 @@ macro_rules! diag {
 #[macro_export]
 macro_rules! help {
     ($msg:expr, $span:expr, $fixed:expr) => {
-        $crate::report::Diagnostic::new($msg, $level, $span, $phase, $notes, $helps)
+        $crate::report::Help::new($msg, $span, $fixed)
     };
 }
 
+#[derive(Debug, Clone)]
 pub struct Span {
     pub id: FileId,
     pub line: usize,
@@ -47,12 +38,35 @@ pub struct Span {
     pub len: usize,
 }
 
+impl Span {
+    pub fn new(id: FileId, line: usize, offset: usize, len: usize) -> Self {
+        Self {
+            id,
+            line,
+            offset,
+            len,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Help {
     pub message: String,
     pub span: Span,
     pub fixed: String,
 }
 
+impl Help {
+    pub fn new(message: String, span: Span, fixed: String) -> Self {
+        Self {
+            message,
+            fixed,
+            span,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Diagnostic {
     pub message: String,
     pub level: Level,
@@ -82,13 +96,13 @@ impl Diagnostic {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Level {
     Error,
     Warn,
 }
 
-#[derive(PartialEq, Display)]
+#[derive(Debug, Clone, PartialEq, Display)]
 pub enum Phase {
     Lexing,
     Parsing,
