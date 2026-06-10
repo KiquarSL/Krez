@@ -1,3 +1,4 @@
+use super::Info;
 use strum::Display;
 
 pub type BExpr = Box<Expr>;
@@ -5,22 +6,42 @@ pub type BExpr = Box<Expr>;
 #[derive(Debug, Clone, Display)]
 pub enum Expr {
     #[strum(to_string = "{0}")]
-    Int(i64),
+    Id(String, Info),
     #[strum(to_string = "{0}")]
-    Float(f64),
+    Int(i64, Info),
     #[strum(to_string = "{0}")]
-    Bool(bool),
+    Float(f64, Info),
+    #[strum(to_string = "{0}")]
+    Bool(bool, Info),
     #[strum(to_string = "\"{0}\"")]
-    Str(String),
+    Str(String, Info),
 
     #[strum(to_string = "({0} {1} {2})")]
-    Arith(BExpr, ArithOp, BExpr),
+    Arith(BExpr, ArithOp, BExpr, Info),
 
     #[strum(to_string = "({0} {1} {2})")]
-    Comp(BExpr, CompOp, BExpr),
+    Comp(BExpr, CompOp, BExpr, Info),
 
     #[strum(to_string = "({0} {1} {2})")]
-    Logic(BExpr, LogicOp, BExpr),
+    Logic(BExpr, LogicOp, BExpr, Info),
+    #[strum(to_string = "{0}{1}")]
+    Unary(UnaryOp, BExpr, Info),
+}
+
+impl Expr {
+    pub fn info(&self) -> Info {
+        match self {
+            Expr::Str(_, info) => info.clone(),
+            Expr::Int(_, info) => info.clone(),
+            Expr::Float(_, info) => info.clone(),
+            Expr::Id(_, info) => info.clone(),
+            Expr::Bool(_, info) => info.clone(),
+            Expr::Arith(_, _, _, info) => info.clone(),
+            Expr::Comp(_, _, _, info) => info.clone(),
+            Expr::Logic(_, _, _, info) => info.clone(),
+            Expr::Unary(_, _, info) => info.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Display)]
@@ -57,4 +78,12 @@ pub enum LogicOp {
     And,
     #[strum(to_string = "||")]
     Or,
+}
+
+#[derive(Debug, Clone, Display)]
+pub enum UnaryOp {
+    #[strum(to_string = "!")]
+    Not,
+    #[strum(to_string = "-")]
+    Neg,
 }

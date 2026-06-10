@@ -70,6 +70,8 @@ pub enum TokenKind {
     Float(f64),
     #[strum(to_string = "{0}")]
     Int(i64),
+
+    Eof,
 }
 
 impl PartialEq for TokenKind {
@@ -117,6 +119,12 @@ pub struct Token {
     pub offset: usize,
     pub pos: usize,
     pub len: usize,
+}
+
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.kind)
+    }
 }
 
 impl Token {

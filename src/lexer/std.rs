@@ -226,6 +226,7 @@ impl<'a> Lexer for StdLexer<'a> {
                 }
             }
         }
+		self.push(TKind::Eof, self.line, self.offset, self.pos, 1);
         self.tokens.clone()
     }
 }
