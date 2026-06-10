@@ -36,7 +36,7 @@ impl<'a, O> KrezCompiler<'a, O> {
             let source = Source::new(path, text);
             self.session.push_source(source);
         }
-        for (file_id, source) in self.session.sources().sources.iter().enumerate() {
+        for (file_id, source) in self.session.sources().iter().enumerate() {
             let tokens = self.lexer.tokenize(file_id);
             if self.session.has_error() {
                 self.session.show_errors();

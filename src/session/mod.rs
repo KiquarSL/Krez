@@ -24,8 +24,16 @@ impl Session {
         self.source_map.sources.push(source);
     }
 
-    pub fn sources(&self) -> &SourceMap {
+    pub fn sources(&self) -> &Vec<Source> {
+        &self.source_map.sources
+    }
+
+    pub fn source_map(&self) -> &SourceMap {
         &self.source_map
+    }
+
+    pub fn source_map_mut(&mut self) -> &mut SourceMap {
+        &mut self.source_map
     }
 
     pub fn has_error(&self) -> bool {

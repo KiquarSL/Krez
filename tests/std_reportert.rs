@@ -11,12 +11,12 @@ fn test_reporter_error() {
 
     let span = span!(file_id, 1, 8, 1);
     let diag = diag!(
-        "unexpected token '@'".to_string(),
         Level::Error,
         span,
         Phase::Lexing,
         vec![],
-        vec![]
+        vec![],
+        "unexpected token '@'",
     );
 
     let reporter = StdReporter::new(Verbose::Verbose);
@@ -29,12 +29,12 @@ fn test_reporter_with_note() {
 
     let span = span!(file_id, 1, 4, 1);
     let diag = diag!(
-        "unused variable".to_string(),
         Level::Warn,
         span,
         Phase::TypeChecking,
-        vec!["variable `x` is never read".to_string()],
-        vec![]
+        vec!["variable `x` is never read"],
+        vec![],
+        "unused variable",
     );
 
     let reporter = StdReporter::new(Verbose::Verbose);
@@ -47,18 +47,19 @@ fn test_reporter_with_help() {
 
     let span = span!(file_id, 1, 4, 1);
     let help = help!(
-        "did you mean to declare `x`?".to_string(),
         span!(file_id, 1, 4, 1),
-        "let x".to_string()
+        "let x",
+        false,
+        "did you mean to declare `x`?",
     );
 
     let diag = diag!(
-        "undefined variable `x`".to_string(),
         Level::Error,
         span,
         Phase::Parsing,
         vec![],
-        vec![help]
+        vec![help],
+        "undefined variable `x`",
     );
 
     let reporter = StdReporter::new(Verbose::Verbose);
@@ -70,14 +71,7 @@ fn test_reporter_dev_mode() {
     let file_id = source_map.add("test.kz", "fn main() {}");
 
     let span = span!(file_id, 0, 0, 1);
-    let diag = diag!(
-        "test".to_string(),
-        Level::Error,
-        span,
-        Phase::CodeGen,
-        vec![],
-        vec![]
-    );
+    let diag = diag!(Level::Error, span, Phase::CodeGen, vec![], vec![], "test",);
 
     let reporter = StdReporter::new(Verbose::Dev);
     reporter.emit(&diag, &source_map);
@@ -89,12 +83,12 @@ fn test_normal_verbosity_skips_warnings() {
 
     let span = span!(file_id, 0, 0, 0);
     let diag = diag!(
-        "test warning".to_string(),
         Level::Warn,
         span,
         Phase::Parsing,
         vec![],
-        vec![]
+        vec![],
+        "test warning",
     );
 
     let reporter = StdReporter::new(Verbose::Normal);
@@ -118,15 +112,15 @@ fn test_macro_span_from_token() {
 fn test_macro_diag_with_all_fields() {
     let file_id = 0;
     let span = span!(file_id, 1, 2, 3);
-    let help_msg = help!("test help".to_string(), span.clone(), "fixed".to_string());
+    let help_msg = help!(span.clone(), "fixed", false, "test help");
 
     let diag = diag!(
-        "test message".to_string(),
         Level::Error,
         span,
         Phase::Lexing,
-        vec!["note 1".to_string()],
-        vec![help_msg]
+        vec!["note 1"],
+        vec![help_msg],
+        "test message",
     );
 
     assert_eq!(diag.message, "test message");

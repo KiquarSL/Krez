@@ -64,7 +64,10 @@ impl StdReporter {
     fn build_help(help: &Help, source_map: &SourceMap) -> String {
         let span = &help.span;
         let mut code_line = source_map.sources[span.id].get_line(span.line);
-        code_line.replace_range(span.offset..span.offset + span.len, &help.fixed);
+        code_line.replace_range(
+            span.offset..(span.offset + span.len),
+            &help.fixed.blue().to_string(),
+        );
 
         let code_line = format!("{} | {code_line}", span.line + 1);
         let padd1 = " ".repeat(span.line.to_string().len());

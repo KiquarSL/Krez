@@ -18,15 +18,18 @@ macro_rules! span {
 }
 #[macro_export]
 macro_rules! diag {
-    ($msg:expr, $level:expr, $span:expr, $phase:expr, $notes:expr, $helps:expr) => {
-        $crate::report::Diagnostic::new($msg, $level, $span, $phase, $notes, $helps)
+    ($level:expr, $span:expr, $phase:expr, $notes:expr, $helps:expr, $($msg:tt)*) => {
+        $crate::report::Diagnostic::new(format!($($msg)*), $level, $span, $phase, $notes, $helps)
+    };
+	($level:expr, $span:expr, $phase:expr, $($msg:tt)*) => {
+        $crate::diag!($level, $span, $phase, vec![], vec![], $($msg)*)
     };
 }
 
 #[macro_export]
 macro_rules! help {
-    ($msg:expr, $span:expr, $fixed:expr) => {
-        $crate::report::Help::new($msg, $span, $fixed)
+    ($span:expr, $fixed:expr, $rm:expr, $($msg:tt)*) => {
+        $crate::report::Help::new(format!($($msg)*), $span, $fixed, $rm)
     };
 }
 
@@ -54,14 +57,16 @@ pub struct Help {
     pub message: String,
     pub span: Span,
     pub fixed: String,
+    pub remove: bool,
 }
 
 impl Help {
-    pub fn new(message: String, span: Span, fixed: String) -> Self {
+    pub fn new(message: String, span: Span, fixed: impl Into<String>, remove: bool) -> Self {
         Self {
             message,
-            fixed,
+            fixed: fixed.into(),
             span,
+            remove,
         }
     }
 }
@@ -78,15 +83,16 @@ pub struct Diagnostic {
 
 impl Diagnostic {
     pub fn new(
-        message: String,
+        message: impl Into<String>,
         level: Level,
         span: Span,
         phase: Phase,
-        notes: Vec<String>,
+        notes: Vec<&str>,
         helps: Vec<Help>,
     ) -> Self {
+        let notes = notes.iter().map(|s| s.to_string()).collect();
         Self {
-            message,
+            message: message.into(),
             level,
             notes,
             phase,

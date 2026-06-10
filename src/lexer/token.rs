@@ -1,7 +1,9 @@
 use std::mem::discriminant;
 use strum;
 
-#[derive(Debug, strum::Display)]
+pub type TKind = TokenKind;
+
+#[derive(Debug, Clone, strum::Display)]
 pub enum TokenKind {
     #[strum(to_string = "+")]
     Plus,
@@ -11,6 +13,8 @@ pub enum TokenKind {
     Star,
     #[strum(to_string = "/")]
     Slash,
+    #[strum(to_string = "!")]
+    Bang,
 
     #[strum(to_string = "=")]
     Assign,
@@ -25,6 +29,8 @@ pub enum TokenKind {
 
     #[strum(to_string = "==")]
     Eq,
+    #[strum(to_string = "!=")]
+    Ne,
     #[strum(to_string = ">")]
     Gt,
     #[strum(to_string = ">=")]
@@ -72,7 +78,7 @@ impl PartialEq for TokenKind {
     }
 }
 
-#[derive(Debug, strum::Display, strum::EnumString)]
+#[derive(Debug, Clone, strum::Display, strum::EnumString)]
 pub enum Keyword {
     #[strum(to_string = "fn")]
     Fn,
@@ -104,6 +110,7 @@ impl PartialEq for Keyword {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub line: usize,
