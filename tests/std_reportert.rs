@@ -5,7 +5,6 @@ use krez::report::{
 use krez::session::source::SourceMap;
 use krez::{diag, help, span};
 
-#[test]
 fn test_reporter_error() {
     let mut source_map = SourceMap::new();
     let file_id = source_map.add("test.kz", "fn main() {\n    x = @ 5\n}");
@@ -24,15 +23,11 @@ fn test_reporter_error() {
     reporter.emit(&diag, &source_map);
 }
 
-#[test]
 fn test_reporter_with_note() {
     let mut source_map = SourceMap::new();
-    let file_id = source_map.add(
-        "test.kz".to_string(),
-        "fn main() {\n    x = 5\n}".to_string(),
-    );
+    let file_id = source_map.add("test.kz", "fn main() {\n    x = 5\n}");
 
-    let span = span!(file_id, 1, 8, 1);
+    let span = span!(file_id, 1, 4, 1);
     let diag = diag!(
         "unused variable".to_string(),
         Level::Warn,
@@ -46,13 +41,9 @@ fn test_reporter_with_note() {
     reporter.emit(&diag, &source_map);
 }
 
-#[test]
 fn test_reporter_with_help() {
     let mut source_map = SourceMap::new();
-    let file_id = source_map.add(
-        "test.kz".to_string(),
-        "fn main() {\n    x = 5\n}".to_string(),
-    );
+    let file_id = source_map.add("test.kz", "fn main() {\n    x = 5\n}");
 
     let span = span!(file_id, 1, 4, 1);
     let help = help!(
@@ -74,10 +65,9 @@ fn test_reporter_with_help() {
     reporter.emit(&diag, &source_map);
 }
 
-#[test]
 fn test_reporter_dev_mode() {
     let mut source_map = SourceMap::new();
-    let file_id = source_map.add("test.kz".to_string(), "fn main() {}".to_string());
+    let file_id = source_map.add("test.kz", "fn main() {}");
 
     let span = span!(file_id, 0, 0, 1);
     let diag = diag!(
@@ -93,10 +83,9 @@ fn test_reporter_dev_mode() {
     reporter.emit(&diag, &source_map);
 }
 
-#[test]
 fn test_normal_verbosity_skips_warnings() {
     let mut source_map = SourceMap::new();
-    let file_id = source_map.add("test.kz".to_string(), "".to_string());
+    let file_id = source_map.add("test.kz", "");
 
     let span = span!(file_id, 0, 0, 0);
     let diag = diag!(
@@ -112,7 +101,6 @@ fn test_normal_verbosity_skips_warnings() {
     reporter.emit(&diag, &source_map);
 }
 
-#[test]
 fn test_macro_span_from_token() {
     use krez::lexer::token::Token;
     use krez::lexer::token::TokenKind;
@@ -127,7 +115,6 @@ fn test_macro_span_from_token() {
     assert_eq!(span.len, 1);
 }
 
-#[test]
 fn test_macro_diag_with_all_fields() {
     let file_id = 0;
     let span = span!(file_id, 1, 2, 3);
@@ -146,4 +133,25 @@ fn test_macro_diag_with_all_fields() {
     assert_eq!(diag.level, Level::Error);
     assert_eq!(diag.notes.len(), 1);
     assert_eq!(diag.helps.len(), 1);
+}
+
+#[test]
+fn main() {
+    println!("\n===== Running tests =====");
+
+    test_reporter_error();
+
+    test_reporter_with_note();
+
+    test_reporter_with_help();
+
+    test_reporter_dev_mode();
+
+    test_normal_verbosity_skips_warnings();
+
+    test_macro_span_from_token();
+
+    test_macro_diag_with_all_fields();
+
+    println!("===== All tests passed! =====");
 }
