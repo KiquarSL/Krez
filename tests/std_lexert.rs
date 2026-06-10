@@ -14,7 +14,8 @@ fn test_lexer_all_tokens() {
 *= / /= /* long 
 comment */ () {} [] // short comment
 true false some1_ident
-fn while ret",
+fn while ret
+\"Some string\"",
     );
     let mut lx = StdLexer::new(&mut session);
     let tokens = lx.tokenize(file_id);

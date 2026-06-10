@@ -197,6 +197,24 @@ impl<'a> Lexer for StdLexer<'a> {
                         len,
                     );
                 }
+                '"' => {
+                    let mut buffer = String::new();
+                    self.advance(1);
+                    while self.valid_pos() {
+                        let current = self.peek(0);
+                        self.advance(1);
+                        if let Some(ch) = current {
+                            if ch != '"' {
+                                buffer.push(ch);
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    self.advance(1);
+                    let len = buffer.len() + 2;
+                    self.push(TKind::Str(buffer), line, offset, pos, len);
+                }
                 _ => {
                     self.session.emit_error(diag!(
                         Level::Error,

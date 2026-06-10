@@ -48,7 +48,7 @@ fn test_reporter_with_help() {
     let span = span!(file_id, 1, 4, 1);
     let help = help!(
         span!(file_id, 1, 4, 1),
-        "let x",
+        "fix x",
         false,
         "did you mean to declare `x`?",
     );
