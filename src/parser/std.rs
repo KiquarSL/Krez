@@ -33,6 +33,15 @@ impl<'a> StdParser<'a> {
         }
     }
 
+    pub fn new_full(session: &'a mut Session, tokens: Vec<Token>, file_id: FileId) -> Self {
+        Self {
+            index: 0,
+            session,
+            tokens,
+            file_id,
+        }
+    }
+
     fn peek(&self, offset: u8) -> Token {
         let index = self.index + offset as usize;
         self.tokens[index].clone()
@@ -61,7 +70,7 @@ impl<'a> StdParser<'a> {
                 _ => break,
             };
             self.advance(1);
-            let right = self.additive()?;
+            let right = self.comparison()?;
             left = Expr::Logic(Box::new(left), op, Box::new(right), info!(op_token));
         }
         Ok(left)

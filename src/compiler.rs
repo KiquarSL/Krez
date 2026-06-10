@@ -42,7 +42,7 @@ impl<'a, O> KrezCompiler<'a, O> {
                 self.session.show_errors();
                 return Ok(());
             }
-            let ast = self.parser.parse(&tokens);
+            let ast = self.parser.parse(tokens, file_id);
             if self.session.has_error() {
                 self.session.show_errors();
                 return Ok(());

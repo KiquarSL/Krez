@@ -3,29 +3,41 @@ use strum::Display;
 
 pub type BExpr = Box<Expr>;
 
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone)]
 pub enum Expr {
-    #[strum(to_string = "{0}")]
     Id(String, Info),
-    #[strum(to_string = "{0}")]
+
     Int(i64, Info),
-    #[strum(to_string = "{0}")]
+
     Float(f64, Info),
-    #[strum(to_string = "{0}")]
+
     Bool(bool, Info),
-    #[strum(to_string = "\"{0}\"")]
+
     Str(String, Info),
 
-    #[strum(to_string = "({0} {1} {2})")]
     Arith(BExpr, ArithOp, BExpr, Info),
 
-    #[strum(to_string = "({0} {1} {2})")]
     Comp(BExpr, CompOp, BExpr, Info),
 
-    #[strum(to_string = "({0} {1} {2})")]
     Logic(BExpr, LogicOp, BExpr, Info),
-    #[strum(to_string = "{0}{1}")]
+
     Unary(UnaryOp, BExpr, Info),
+}
+
+impl std::fmt::Display for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Expr::Id(s, _info) => write!(f, "{}", s),
+            Expr::Int(n, _info) => write!(f, "{}", n),
+            Expr::Float(n, _info) => write!(f, "{}", n),
+            Expr::Bool(b, _info) => write!(f, "{}", b),
+            Expr::Str(s, _info) => write!(f, "\"{}\"", s),
+            Expr::Arith(l, op, r, _info) => write!(f, "({} {} {})", l, op, r),
+            Expr::Comp(l, op, r, _info) => write!(f, "({} {} {})", l, op, r),
+            Expr::Logic(l, op, r, _info) => write!(f, "({} {} {})", l, op, r),
+            Expr::Unary(op, e, _info) => write!(f, "{}{}", op, e),
+        }
+    }
 }
 
 impl Expr {

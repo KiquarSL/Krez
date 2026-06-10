@@ -88,9 +88,9 @@ impl<'a> Lexer for StdLexer<'a> {
                     });
                     self.advance(1);
                 }
-                '+' => double_token!(self, '=', AssignPlus, Assign),
-                '-' => double_token!(self, '=', AssignMinus, Assign),
-                '*' => double_token!(self, '=', AssignStar, Assign),
+                '+' => double_token!(self, '=', AssignPlus, Plus),
+                '-' => double_token!(self, '=', AssignMinus, Minus),
+                '*' => double_token!(self, '=', AssignStar, Star),
 
                 '=' => double_token!(self, '=', Eq, Assign),
                 '!' => double_token!(self, '=', Ne, Bang),
@@ -226,7 +226,7 @@ impl<'a> Lexer for StdLexer<'a> {
                 }
             }
         }
-		self.push(TKind::Eof, self.line, self.offset, self.pos, 1);
+        self.push(TKind::Eof, self.line, self.offset, self.pos, 1);
         self.tokens.clone()
     }
 }

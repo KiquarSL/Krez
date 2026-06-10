@@ -1,55 +1,43 @@
 use colored::*;
 use krez::lexer::{Lexer, std::StdLexer};
+use krez::parser::std::StdParser;
 use krez::report::std::{StdReporter, Verbose};
 use krez::session::Session;
 
-fn test_lexer_all_tokens() {
-    println!("{}", "test_lexer_all_tokens".yellow());
+fn test_parser_expr_arithmetic() {
+    println!("{}", "test_parser_arithmetic".yellow());
     let mut session = Session::new(Box::new(StdReporter::new(Verbose::Dev)));
     let source_map = session.source_map_mut();
-    let file_id = source_map.add(
-        "test.kz",
-        "+ - * /
-< <= >= > != == && ||
-= += -= *= /= 
-/* long 
-comment */ () {} [] // short comment
-true false some1_ident
-fn while ret
-\"Some string\"",
-    );
+    let file_id = source_map.add("test.kz", "2 / 2 + 2 * 2");
     let mut lx = StdLexer::new(&mut session);
     let tokens = lx.tokenize(file_id);
-    println!("{}", "Tokenized:".blue());
-    for token in tokens {
-        println!("{}", token);
-    }
+    let mut pr = StdParser::new_full(&mut session, tokens, file_id);
+    println!("AST: {}", pr.expr().unwrap());
     if session.has_error() {
         session.show_errors();
     }
     assert_eq!(session.has_error(), false);
 }
 
-fn test_lexer_errors() {
-    println!("{}", "test_lexer_errors".yellow());
+fn test_parser_expr_compare_and_logic() {
+    println!("{}", "test_parser_expr_compare_and_logic".yellow());
     let mut session = Session::new(Box::new(StdReporter::new(Verbose::Dev)));
     let source_map = session.source_map_mut();
-    let file_id = source_map.add("test.kz", "@ # | &");
+    let file_id = source_map.add("test.kz", "2 / 2 + 2 * 2 > 2 && 1 != 2");
     let mut lx = StdLexer::new(&mut session);
     let tokens = lx.tokenize(file_id);
-    for token in tokens {
-        println!("{}", token);
-    }
+    let mut pr = StdParser::new_full(&mut session, tokens, file_id);
+    println!("AST: {}", pr.expr().unwrap());
     if session.has_error() {
         session.show_errors();
     }
-    assert_eq!(session.has_error(), true);
+    assert_eq!(session.has_error(), false);
 }
 
 #[test]
 fn main() {
     println!("===== Running tests =====");
-    test_lexer_all_tokens();
-    test_lexer_errors();
+    test_parser_expr_arithmetic();
+    test_parser_expr_compare_and_logic();
     println!("===== All tests passed! =====");
 }
