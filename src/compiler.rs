@@ -1,7 +1,6 @@
 use crate::backend::Backend;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
-use crate::report::Reporter;
 use crate::session::{Session, source::Source};
 use std::fs;
 use std::path::Path;
@@ -18,11 +17,10 @@ impl<'a, O> KrezCompiler<'a, O> {
     pub fn new(
         lexer: Box<dyn Lexer>,
         parser: Box<dyn Parser>,
-        reporter: Box<dyn Reporter>,
         backend: Box<dyn Backend<Output = O>>,
+        session: Session,
         build_dir: &'a str,
     ) -> Self {
-        let session = Session::new(reporter);
         Self {
             lexer,
             backend,

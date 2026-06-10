@@ -1,4 +1,7 @@
+pub mod std;
+
 use crate::session::source::{FileId, SourceMap};
+use strum::Display;
 
 pub trait Reporter {
     fn emit(&self, diag: &Diagnostic, source_map: &SourceMap);
@@ -14,17 +17,26 @@ macro_rules! span {
             $len,
         }
     };
+	($id:expr, $token:expr) => {
+        $crate::report::Span {
+            $id,
+            $token.line,
+            $token.offset,
+            $token.len,
+        }
+    };
 }
 #[macro_export]
 macro_rules! diag {
-    ($msg:expr, $level:expr, $span:expr, $phase:expr, $($notes:expr)*) => {
-        $crate::report::Diagnostic {
-            $msg,
-            $level,
-            $span,
-            $phase,
-            $notes,
-        }
+    ($msg:expr, $level:expr, $span:expr, $phase:expr, $notes:expr, $helps:expr) => {
+        $crate::report::Diagnostic::new($msg, $level, $span, $phase, $notes, $helps)
+    };
+}
+
+#[macro_export]
+macro_rules! help {
+    ($msg:expr, $span:expr, $fixed:expr) => {
+        $crate::report::Diagnostic::new($msg, $level, $span, $phase, $notes, $helps)
     };
 }
 
@@ -35,12 +47,19 @@ pub struct Span {
     pub len: usize,
 }
 
+pub struct Help {
+    pub message: String,
+    pub span: Span,
+    pub fixed: String,
+}
+
 pub struct Diagnostic {
     pub message: String,
     pub level: Level,
     pub span: Span,
     pub phase: Phase,
-    pub notes: Vec<Diagnostic>,
+    pub notes: Vec<String>,
+    pub helps: Vec<Help>,
 }
 
 impl Diagnostic {
@@ -49,7 +68,8 @@ impl Diagnostic {
         level: Level,
         span: Span,
         phase: Phase,
-        notes: Vec<Diagnostic>,
+        notes: Vec<String>,
+        helps: Vec<Help>,
     ) -> Self {
         Self {
             message,
@@ -57,6 +77,7 @@ impl Diagnostic {
             notes,
             phase,
             span,
+            helps,
         }
     }
 }
@@ -65,11 +86,9 @@ impl Diagnostic {
 pub enum Level {
     Error,
     Warn,
-    Note,
-    Help,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Display)]
 pub enum Phase {
     Lexing,
     Parsing,
