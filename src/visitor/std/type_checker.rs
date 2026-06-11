@@ -13,10 +13,10 @@ impl StdTypeChecker {
     }
 }
 
-impl TypeChecker for StdTypeChecker {}
+// impl TypeChecker for StdTypeChecker {}
 
 impl Visitor for StdTypeChecker {
-    type Result = Type;
+    type Result = (); //Type;
 
     fn run(&mut self, _api: &mut KrezCompilerApi) {
         todo!()
@@ -70,11 +70,7 @@ impl Visitor for StdTypeChecker {
         todo!()
     }
 
-    fn visit_call(&mut self, right: &Expr, args: &[Expr], _info: &Info) -> Self::Result {
-        todo!()
-    }
-
-    fn visit_stmt(&mut self, stmt: &Stmt) -> Self::Result {
+    fn visit_call(&mut self, right: &Expr, args: Vec<Expr>, _info: &Info) -> Self::Result {
         todo!()
     }
 
@@ -98,11 +94,11 @@ impl Visitor for StdTypeChecker {
         todo!()
     }
 
-    fn visit_while(&mut self, cond: &Expr, body: &[Stmt]) -> Self::Result {
+    fn visit_while(&mut self, cond: &Expr, body: Vec<Stmt>) -> Self::Result {
         todo!()
     }
 
-    fn visit_if_else(&mut self, branches: &[(Option<Expr>, Vec<Stmt>)]) -> Self::Result {
+    fn visit_if_else(&mut self, branches: Vec<(Option<Expr>, Vec<Stmt>)>) -> Self::Result {
         todo!()
     }
 
@@ -120,11 +116,11 @@ impl Visitor for StdTypeChecker {
         todo!()
     }
 
-    fn visit_break(&mut self) -> Self::Result {
+    fn visit_break(&mut self) {
         todo!()
     }
 
-    fn visit_continue(&mut self) -> Self::Result {
+    fn visit_continue(&mut self) {
         todo!()
     }
 }

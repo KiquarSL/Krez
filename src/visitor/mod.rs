@@ -22,7 +22,7 @@ pub trait Visitor {
     fn visit_comp(&mut self, left: &Expr, op: CompOp, right: &Expr, info: &Info) -> Self::Result;
     fn visit_logic(&mut self, left: &Expr, op: LogicOp, right: &Expr, info: &Info) -> Self::Result;
     fn visit_unary(&mut self, op: UnaryOp, right: &Expr, info: &Info) -> Self::Result;
-    fn visit_call(&mut self, right: &Expr, args: &Vec<Expr>, info: &Info) -> Self::Result;
+    fn visit_call(&mut self, right: &Expr, args: Vec<Expr>, info: &Info) -> Self::Result;
 
     fn visit_fn(
         &mut self,
@@ -45,8 +45,8 @@ pub trait Visitor {
         assign: AssignOp,
         value: Expr,
     ) -> Self::Result;
-    fn visit_while(&mut self, cond: &Expr, body: &Vec<Stmt>) -> Self::Result;
-    fn visit_if_else(&mut self, branches: &Vec<(Option<Expr>, Vec<Stmt>)>) -> Self::Result;
+    fn visit_while(&mut self, cond: &Expr, body: Vec<Stmt>) -> Self::Result;
+    fn visit_if_else(&mut self, branches: Vec<(Option<Expr>, Vec<Stmt>)>) -> Self::Result;
     fn visit_return(&mut self, ret: Option<Expr>) -> Self::Result;
     fn visit_break(&mut self);
     fn visit_continue(&mut self);

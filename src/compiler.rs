@@ -6,15 +6,17 @@ use crate::session::{
     source::{FileId, Source},
 };
 use crate::visitor::{Analyzer, Optimizer, TypeChecker, Visitor};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::rc::Rc;
 
 pub struct KrezCompiler<'a, O> {
     lexer: Box<dyn Lexer>,
     parser: Box<dyn Parser>,
     backend: Box<dyn Backend<Output = O>>,
-    session: Session,
+    session: Rc<RefCell<Session>>,
     build_dir: &'a str,
 
     ast: HashMap<FileId, Vec<Stmt>>,
@@ -35,11 +37,11 @@ impl<'a, O> KrezCompiler<'a, O> {
         optimizers: Vec<Box<dyn Optimizer>>,
     ) -> Self {
         Self {
+            session: Rc::new(RefCell::new(session)),
             lexer,
             backend,
             build_dir,
             parser,
-            session,
             analyzers,
             optimizers,
             type_checkers,
@@ -48,16 +50,12 @@ impl<'a, O> KrezCompiler<'a, O> {
     }
 
     pub fn compile(&mut self, files: Vec<String>) -> std::io::Result<()> {
-        let api = KrezCompilerApi {
-            session: &mut self.session,
-            ast: &mut self.ast,
-        };
         for path in files {
             let text = fs::read_to_string(&path)?;
             let source = Source::new(path, text);
             self.session.push_source(source);
         }
-        for (file_id, source) in self.session.sources().iter().enumerate() {
+        for (file_id, _source) in self.session.sources().iter().enumerate() {
             let tokens = self.lexer.tokenize(file_id);
             if self.session.has_error() {
                 self.session.show_errors();
@@ -70,22 +68,26 @@ impl<'a, O> KrezCompiler<'a, O> {
                 return Ok(());
             }
         }
-        for analyzer in &self.analyzers {
-            analyzer.run(api);
+        let mut api = KrezCompilerApi {
+            session: &mut self.session,
+            ast: &mut self.ast,
+        };
+        for analyzer in &mut self.analyzers {
+            analyzer.run(&mut api);
         }
         if self.session.has_error() {
             self.session.show_errors();
             return Ok(());
         }
-        for type_checker in &self.type_checkers {
-            type_checker.run(api);
+        for type_checker in &mut self.type_checkers {
+            type_checker.run(&mut api);
         }
         if self.session.has_error() {
             self.session.show_errors();
             return Ok(());
         }
-        for optimizer in &self.optimizers {
-            optimizer.run(api);
+        for optimizer in &mut self.optimizers {
+            optimizer.run(&mut api);
         }
         if self.session.has_error() {
             self.session.show_errors();
