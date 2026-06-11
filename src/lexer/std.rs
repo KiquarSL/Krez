@@ -76,7 +76,7 @@ impl<'a> Lexer for StdLexer<'a> {
 
             match current {
                 ch if ch.is_whitespace() => self.advance(1),
-                ch if "(){}[],".contains(ch) => {
+                ch if "(){}[],;".contains(ch) => {
                     self.push_one(match ch {
                         '(' => TKind::LParen,
                         ')' => TKind::RParen,
@@ -85,6 +85,7 @@ impl<'a> Lexer for StdLexer<'a> {
                         '{' => TKind::LBrace,
                         '}' => TKind::RBrace,
                         ',' => TKind::Comma,
+                        ';' => TKind::Semicolon,
                         _ => unreachable!(),
                     });
                     self.advance(1);
@@ -132,10 +133,10 @@ impl<'a> Lexer for StdLexer<'a> {
                     let mut buffer = String::new();
                     while self.valid_pos() {
                         let current = self.peek(0);
-                        self.advance(1);
                         if let Some(ch) = current {
                             if ch == '.' || ch.is_digit(10) {
                                 buffer.push(ch);
+                                self.advance(1);
                             } else {
                                 break;
                             }
@@ -204,10 +205,10 @@ impl<'a> Lexer for StdLexer<'a> {
                     self.advance(1);
                     while self.valid_pos() {
                         let current = self.peek(0);
-                        self.advance(1);
                         if let Some(ch) = current {
                             if ch != '"' {
                                 buffer.push(ch);
+                                self.advance(1);
                             } else {
                                 break;
                             }

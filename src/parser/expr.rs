@@ -5,22 +5,15 @@ pub type BExpr = Box<Expr>;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
+    Invalid,
     Id(String, Info),
-
     Int(i64, Info),
-
     Float(f64, Info),
-
     Bool(bool, Info),
-
     Str(String, Info),
-
     Arith(BExpr, ArithOp, BExpr, Info),
-
     Comp(BExpr, CompOp, BExpr, Info),
-
     Logic(BExpr, LogicOp, BExpr, Info),
-
     Unary(UnaryOp, BExpr, Info),
 }
 
@@ -36,6 +29,7 @@ impl std::fmt::Display for Expr {
             Expr::Comp(l, op, r, _info) => write!(f, "({} {} {})", l, op, r),
             Expr::Logic(l, op, r, _info) => write!(f, "({} {} {})", l, op, r),
             Expr::Unary(op, e, _info) => write!(f, "{}{}", op, e),
+            Expr::Invalid => write!(f, "INVALID_VALUE"),
         }
     }
 }
@@ -43,15 +37,20 @@ impl std::fmt::Display for Expr {
 impl Expr {
     pub fn info(&self) -> Info {
         match self {
-            Expr::Str(_, info) => info.clone(),
-            Expr::Int(_, info) => info.clone(),
-            Expr::Float(_, info) => info.clone(),
-            Expr::Id(_, info) => info.clone(),
-            Expr::Bool(_, info) => info.clone(),
-            Expr::Arith(_, _, _, info) => info.clone(),
-            Expr::Comp(_, _, _, info) => info.clone(),
-            Expr::Logic(_, _, _, info) => info.clone(),
-            Expr::Unary(_, _, info) => info.clone(),
+            Expr::Str(_, info)
+            | Expr::Int(_, info)
+            | Expr::Float(_, info)
+            | Expr::Id(_, info)
+            | Expr::Bool(_, info)
+            | Expr::Arith(_, _, _, info)
+            | Expr::Comp(_, _, _, info)
+            | Expr::Logic(_, _, _, info)
+            | Expr::Unary(_, _, info) => info.clone(),
+            Expr::Invalid => Info {
+                line: 0,
+                offset: 0,
+                len: 0,
+            },
         }
     }
 }
