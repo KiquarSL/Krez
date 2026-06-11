@@ -18,7 +18,7 @@ macro_rules! emit_error {
             $notes,
             $helps,
             $($msg)*
-        ));
+         ));
     };
 }
 
@@ -214,6 +214,19 @@ impl<'a> StdParser<'a> {
         args
     }
 
+    pub fn parse_args(&mut self) -> Vec<Expr> {
+        let mut args = Vec::new();
+        while self.valid_pos() && self.peek(0).kind != TKind::RParen {
+            let expr = match self.expr() {
+                Ok(expr) => expr,
+                Err(_) => Expr::Invalid,
+            };
+            args.push(expr);
+            self.check(TKind::Comma);
+        }
+        args
+    }
+
     fn skip_until(&mut self, untils: &[TKind]) {
         while self.valid_pos() && !untils.contains(&self.peek(0).kind) {
             self.advance(1);
@@ -337,27 +350,56 @@ impl<'a> StdParser<'a> {
                 Ok(Expr::Str(s, info!(token)))
             }
             TKind::Id(id) => {
+                let mut path = vec![id];
                 self.advance(1);
-                Ok(Expr::Id(id, info!(token)))
+                while self.valid_pos() {
+                    if !self.check(TKind::Path) {
+                        break;
+                    }
+                    if let TKind::Id(id) = self.peek(0).kind {
+                        path.push(id);
+                        self.advance(1);
+                    }
+                }
+                let end = self.peek(0);
+                if self.check(TKind::LParen) {
+                    let args = self.parse_args();
+                    if !self.check(TKind::RParen) {
+                        let rparen = self.back_peek(1);
+                        emit_error!(
+                            self,
+                            rparen,
+                            vec![],
+                            vec![help!(
+                                span!(self.file_id, rparen.line, rparen.offset + rparen.len, 0),
+                                ")",
+                                false,
+                                "Add ')' here"
+                            )],
+                            "Expected ')', found {}",
+                            rparen
+                        );
+                    }
+                    let id = Expr::Id(path, info!(token.line, token.offset, end.pos - token.pos));
+                    Ok(Expr::Call(Box::new(id.clone()), args, id.info()))
+                } else {
+                    Ok(Expr::Id(
+                        path,
+                        info!(token.line, token.offset, end.pos - token.pos),
+                    ))
+                }
             }
             TKind::LParen => {
                 self.advance(1);
                 let expr = self.expr()?;
                 if !self.check(TKind::RParen) {
                     let rparen = self.back_peek(1);
-                    let new_token = Token::new(
-                        TKind::RParen,
-                        rparen.line,
-                        rparen.offset + rparen.len,
-                        rparen.pos,
-                        1,
-                    );
                     emit_error!(
                         self,
                         rparen,
                         vec![],
                         vec![help!(
-                            span!(self.file_id, new_token.line, new_token.offset, 0),
+                            span!(self.file_id, rparen.line, rparen.offset + rparen.len, 0),
                             ")",
                             false,
                             "Add ')' here"

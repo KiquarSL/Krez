@@ -6,7 +6,7 @@ pub type BExpr = Box<Expr>;
 #[derive(Debug, Clone)]
 pub enum Expr {
     Invalid,
-    Id(String, Info),
+    Id(Vec<String>, Info),
     Int(i64, Info),
     Float(f64, Info),
     Bool(bool, Info),
@@ -15,12 +15,20 @@ pub enum Expr {
     Comp(BExpr, CompOp, BExpr, Info),
     Logic(BExpr, LogicOp, BExpr, Info),
     Unary(UnaryOp, BExpr, Info),
+    Call(BExpr, Vec<Expr>, Info),
 }
 
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Expr::Id(s, _info) => write!(f, "{}", s),
+            Expr::Id(path, _info) => write!(
+                f,
+                "{}",
+                path.iter()
+                    .map(|s| s.clone())
+                    .collect::<Vec<_>>()
+                    .join("::")
+            ),
             Expr::Int(n, _info) => write!(f, "{}", n),
             Expr::Float(n, _info) => write!(f, "{}", n),
             Expr::Bool(b, _info) => write!(f, "{}", b),
@@ -29,6 +37,17 @@ impl std::fmt::Display for Expr {
             Expr::Comp(l, op, r, _info) => write!(f, "({} {} {})", l, op, r),
             Expr::Logic(l, op, r, _info) => write!(f, "({} {} {})", l, op, r),
             Expr::Unary(op, e, _info) => write!(f, "{}{}", op, e),
+            Expr::Call(func, args, _info) => {
+                write!(
+                    f,
+                    "{}({})",
+                    func,
+                    args.iter()
+                        .map(|a| format!("{}", a))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
             Expr::Invalid => write!(f, "INVALID_VALUE"),
         }
     }
@@ -45,7 +64,8 @@ impl Expr {
             | Expr::Arith(_, _, _, info)
             | Expr::Comp(_, _, _, info)
             | Expr::Logic(_, _, _, info)
-            | Expr::Unary(_, _, info) => info.clone(),
+            | Expr::Unary(_, _, info)
+            | Expr::Call(_, _, info) => info.clone(),
             Expr::Invalid => Info {
                 line: 0,
                 offset: 0,
@@ -54,7 +74,6 @@ impl Expr {
         }
     }
 }
-
 #[derive(Debug, Clone, Display)]
 pub enum ArithOp {
     #[strum(to_string = "+")]

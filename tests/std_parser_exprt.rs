@@ -8,7 +8,7 @@ fn test_parser_expr_arithmetic() {
     println!("{}", "test_parser_arithmetic".yellow());
     let mut session = Session::new(Box::new(StdReporter::new(Verbose::Dev)));
     let source_map = session.source_map_mut();
-    let file_id = source_map.add("test.kz", "2 / 2 + 2 * 2");
+    let file_id = source_map.add("test.kz", "2 / 2 + 2 * 2 + math::add(1, 3)");
     let mut lx = StdLexer::new(&mut session);
     let tokens = lx.tokenize(file_id);
     let mut pr = StdParser::new_full(&mut session, tokens, file_id);
