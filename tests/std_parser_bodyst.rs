@@ -46,8 +46,11 @@ fn main(argc: i32, args: &[string]) i32 {
     fix b true ;
     mut z: f32 = ;
     fix j = ;
-}"
-        ,
+	
+	z = ;
+	z += 8;
+	*z 4;
+}",
     );
     let mut lx = StdLexer::new(&mut session);
     let tokens = lx.tokenize(file_id);

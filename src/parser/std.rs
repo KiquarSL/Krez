@@ -392,11 +392,21 @@ enum StmtKind {
 
 fn define(pr: &StdParser) -> StmtKind {
     let token = pr.peek(0);
-    match token.kind {
-        TKind::Keyword(Keyword::Fix | Keyword::Mut) => StmtKind::Declare,
-        TKind::Keyword(Keyword::Fn) => StmtKind::Fn,
-        TKind::Keyword(Keyword::While) => StmtKind::While,
-        TKind::Id(_) => StmtKind::Assign,
+    let next_token = pr.peek(1);
+
+    match (token.kind, next_token.kind) {
+        (TKind::Keyword(Keyword::Fix | Keyword::Mut), _) => StmtKind::Declare,
+        (TKind::Keyword(Keyword::Fn), _) => StmtKind::Fn,
+        (TKind::Keyword(Keyword::While), _) => StmtKind::While,
+        (
+            TKind::Id(_),
+            TKind::Assign
+            | TKind::AssignPlus
+            | TKind::AssignMinus
+            | TKind::AssignSlash
+            | TKind::AssignStar,
+        ) => StmtKind::Assign,
+        (TKind::Star, TKind::Id(_)) => StmtKind::Assign,
         _ => StmtKind::Expr,
     }
 }
@@ -406,9 +416,117 @@ impl<'a> StdParser<'a> {
         Ok(match define(self) {
             StmtKind::Expr => Stmt::Expr(self.expr()?),
             StmtKind::Declare => self.stmt_declare(),
+            StmtKind::Assign => self.stmt_assign(),
             StmtKind::Fn => self.stmt_fn(),
             _ => todo!(),
         })
+    }
+
+    fn stmt_assign(&mut self) -> Stmt {
+        let deref = if self.peek(0).kind == TKind::Star {
+            self.advance(1);
+            true
+        } else {
+            false
+        };
+        let id = self.peek(0);
+        let id = match id.kind {
+            TKind::Id(id) => {
+                self.advance(1);
+                id
+            }
+            _ => {
+                emit_error!(
+                    self,
+                    id,
+                    vec![],
+                    vec![help!(
+                        span!(self.file_id, id.line, id.offset, 0),
+                        "var_ident",
+                        false,
+                        "Add variable identificator here"
+                    )],
+                    "Expected identificator, found {id}"
+                );
+                self.skip_until(&[TKind::Semicolon]);
+                self.advance(1);
+                return Stmt::Assign(
+                    deref,
+                    String::from("INVALID_IDENT"),
+                    AssignOp::default(),
+                    Expr::Invalid,
+                );
+            }
+        };
+        let assign = self.peek(0);
+        let assign = match assign.kind {
+            TKind::Assign => AssignOp::default(),
+            TKind::AssignPlus => AssignOp::Plus,
+            TKind::AssignMinus => AssignOp::Minus,
+            TKind::AssignStar => AssignOp::Star,
+            TKind::AssignSlash => AssignOp::Slash,
+            _ => {
+                emit_error!(
+                    self,
+                    assign,
+                    vec![],
+                    vec![help!(
+                        span!(self.file_id, assign.line, assign.offset, 0),
+                        "= ",
+                        false,
+                        "Add assign operator here"
+                    )],
+                    "Expected =/+=/-=/*=//=, found {id}"
+                );
+                self.skip_until(&[TKind::Semicolon]);
+                self.advance(1);
+                return Stmt::Assign(deref, id, AssignOp::default(), Expr::Invalid);
+            }
+        };
+        self.advance(1);
+
+        if self.peek(0).kind == TKind::Semicolon {
+            let semicolon = self.peek(0);
+            emit_error!(
+                self,
+                semicolon,
+                vec![],
+                vec![help!(
+                    span!(self.file_id, semicolon.line, semicolon.offset, 0),
+                    "expression",
+                    false,
+                    "Add expression here"
+                )],
+                "Expected expression, found {}",
+                semicolon
+            );
+            self.advance(1);
+            return Stmt::Assign(deref, id, assign, Expr::Invalid);
+        }
+        let val = match self.expr() {
+            Ok(expr) => expr,
+            Err(_) => {
+                self.skip_until(&[TKind::Semicolon]);
+                Expr::Invalid
+            }
+        };
+        if !self.check(TKind::Semicolon) {
+            let semicolon = self.peek(0);
+            emit_error!(
+                self,
+                semicolon,
+                vec![],
+                vec![help!(
+                    span!(self.file_id, semicolon.line, semicolon.offset, 0),
+                    ";",
+                    false,
+                    "Add ';' here"
+                )],
+                "Expected ';', found {}",
+                semicolon
+            );
+        }
+        Stmt::Assign(deref, id, assign, val)
     }
 
     fn stmt_declare(&mut self) -> Stmt {
