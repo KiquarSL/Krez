@@ -454,7 +454,6 @@ impl<'a> StdParser<'a> {
                     "Expected '{{', found {}",
                     lbrace
                 );
-                self.skip_until(&[TKind::RBrace]);
             }
             let body = self.parse_body();
             if !self.check(TKind::RBrace) {
@@ -580,12 +579,13 @@ impl<'a> StdParser<'a> {
         };
         if !self.check(TKind::Semicolon) {
             let semicolon = self.peek(0);
+            let new = self.back_peek(1);
             emit_error!(
                 self,
                 semicolon,
                 vec![],
                 vec![help!(
-                    span!(self.file_id, semicolon.line, semicolon.offset, 0),
+                    span!(self.file_id, new.line, new.offset + new.len, 0),
                     ";",
                     false,
                     "Add ';' here"
@@ -685,12 +685,13 @@ impl<'a> StdParser<'a> {
         };
         if !self.check(TKind::Semicolon) {
             let semicolon = self.peek(0);
+            let new = self.back_peek(1);
             emit_error!(
                 self,
                 semicolon,
                 vec![],
                 vec![help!(
-                    span!(self.file_id, semicolon.line, semicolon.offset, 0),
+                    span!(self.file_id, new.line, new.offset + new.len, 0),
                     ";",
                     false,
                     "Add ';' here"

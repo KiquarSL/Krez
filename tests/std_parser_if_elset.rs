@@ -36,7 +36,7 @@ if a < 3 {
 }
 
 fn test_parser_if_else_err() {
-    println!("{}", "test_parser_if_else".yellow());
+    println!("{}", "test_parser_if_else_err".yellow());
     let mut session = Session::new(Box::new(StdReporter::new(Verbose::Dev)));
     let source_map = session.source_map_mut();
     let file_id = source_map.add(
