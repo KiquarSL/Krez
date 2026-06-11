@@ -384,6 +384,7 @@ impl<'a> StdParser<'a> {
 
 enum StmtKind {
     Fn,
+    IfElse,
     Declare,
     Assign,
     While,
@@ -396,6 +397,7 @@ fn define(pr: &StdParser) -> StmtKind {
 
     match (token.kind, next_token.kind) {
         (TKind::Keyword(Keyword::Fix | Keyword::Mut), _) => StmtKind::Declare,
+        (TKind::Keyword(Keyword::If), _) => StmtKind::IfElse,
         (TKind::Keyword(Keyword::Fn), _) => StmtKind::Fn,
         (TKind::Keyword(Keyword::While), _) => StmtKind::While,
         (
@@ -418,8 +420,74 @@ impl<'a> StdParser<'a> {
             StmtKind::Declare => self.stmt_declare(),
             StmtKind::Assign => self.stmt_assign(),
             StmtKind::Fn => self.stmt_fn(),
-            _ => todo!(),
+            StmtKind::IfElse => self.stmt_if_else(),
+            _ => Stmt::Expr(self.expr()?),
         })
+    }
+
+    fn stmt_if_else(&mut self) -> Stmt {
+        self.advance(1);
+        let mut has_else = false;
+        let mut branches = vec![];
+        while self.valid_pos() {
+            let cond = if has_else {
+                None
+            } else {
+                match self.expr() {
+                    Ok(expr) => Some(expr),
+                    Err(_) => Some(Expr::Invalid),
+                }
+            };
+
+            if !self.check(TKind::LBrace) {
+                let lbrace = self.peek(0);
+                emit_error!(
+                    self,
+                    lbrace,
+                    vec![],
+                    vec![help!(
+                        span!(self.file_id, lbrace.line, lbrace.offset, 0),
+                        "{",
+                        false,
+                        "Add '{{' here"
+                    )],
+                    "Expected '{{', found {}",
+                    lbrace
+                );
+                self.skip_until(&[TKind::RBrace]);
+            }
+            let body = self.parse_body();
+            if !self.check(TKind::RBrace) {
+                let rbrace = self.peek(0);
+                emit_error!(
+                    self,
+                    rbrace,
+                    vec![],
+                    vec![help!(
+                        span!(self.file_id, rbrace.line, rbrace.offset, 0),
+                        "}}",
+                        false,
+                        "Add '}}' here"
+                    )],
+                    "Expected '}}', found {}",
+                    rbrace
+                );
+            }
+            branches.push((cond, body));
+            if let TKind::Keyword(kw) = self.peek(0).kind {
+                if kw == Keyword::Elif {
+                    self.advance(1);
+                    continue;
+                } else if kw == Keyword::Else {
+                    self.advance(1);
+                    has_else = true;
+                    continue;
+                }
+            }
+
+            break;
+        }
+        Stmt::IfElse(branches)
     }
 
     fn stmt_assign(&mut self) -> Stmt {

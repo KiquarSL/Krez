@@ -9,6 +9,7 @@ pub enum Stmt {
     Assign(bool, String, AssignOp, Expr),
     While(Expr, Vec<Stmt>),
     Func(String, Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
+    IfElse(Vec<(Option<Expr>, Vec<Stmt>)>),
     Expr(Expr),
 }
 
@@ -38,12 +39,43 @@ impl fmt::Display for Stmt {
                 let head = format!("fn {id}({}) {ret_ty} {{", display_args(args.to_vec()),);
                 let body = body
                     .iter()
-                    .map(|stmt| format!("\t{stmt}"))
+                    .map(|stmt| format!("    {stmt}"))
                     .collect::<Vec<_>>()
                     .join("\n");
                 format!("{head}\n{body}\n}}")
             }
-         };
+            Stmt::IfElse(branches) => {
+                let mut buffer = String::new();
+                for (i, (cond, body)) in branches.iter().enumerate() {
+                    let if_kw = if i == 0 {
+                        "if"
+                    } else if cond.is_some() {
+                        "elif"
+                    } else {
+                        "else"
+                    };
+                    let cond_str = if let Some(condition) = cond {
+                        condition.clone().to_string()
+                    } else {
+                        String::from("")
+                    } + " ";
+                    buffer.push_str(&format!("{if_kw} {cond_str}{{\n"));
+                    buffer.push_str(
+                        &body
+                            .iter()
+                            .map(|stmt| format!("    {stmt}"))
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                    );
+                    if i == branches.len() - 1 {
+                        buffer.push_str("\n}\n");
+                    } else {
+                        buffer.push_str("\n} ");
+                    }
+                }
+                buffer
+            }
+        };
         write!(f, "{s}")
     }
 }
