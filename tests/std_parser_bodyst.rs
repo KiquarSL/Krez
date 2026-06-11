@@ -40,13 +40,14 @@ fn test_parser_bodys_err() {
         "
 fn main(argc: i32, args: &[string]) i32 {
 	// expr stmt
-    3 * (3+4/(2*2)) + (2+2
+	3 * (3+4/(2*2)) + (2+2
 		
-    mut  = 4;
+	mut  = 4;
     fix b true ;
     mut z: f32 = ;
     fix j = ;
-}",
+}"
+        ,
     );
     let mut lx = StdLexer::new(&mut session);
     let tokens = lx.tokenize(file_id);

@@ -9,7 +9,7 @@ pub struct Source {
 
 impl Source {
     pub fn new(name: impl Into<String>, text: impl Into<String>) -> Self {
-        let text = text.into();
+        let text = text.into().replace("\t", "    ");
         let lines = Self::compute_lines(&text);
         Self {
             name: name.into(),

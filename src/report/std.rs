@@ -51,7 +51,9 @@ impl StdReporter {
 
     fn build_diag(diag: &Diagnostic, source_map: &SourceMap) -> String {
         let span = &diag.span;
-        let code_line = source_map.sources[span.id].get_line(span.line);
+        let code_line = source_map.sources[span.id]
+            .get_line(span.line)
+            .replace("\t", "    ");
         let code_line = format!("{} | {code_line}", span.line + 1);
 
         let padd1 = " ".repeat(span.line.to_string().len());

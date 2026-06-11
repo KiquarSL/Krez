@@ -75,7 +75,9 @@ impl<'a> Lexer for StdLexer<'a> {
             let pos = self.pos;
 
             match current {
-                ch if ch.is_whitespace() => self.advance(1),
+                ch if ch.is_whitespace() => {
+                    self.advance(1);
+                }
                 ch if "(){}[],;".contains(ch) => {
                     self.push_one(match ch {
                         '(' => TKind::LParen,
