@@ -38,6 +38,9 @@ fn test_parser_function_err() {
         "
 fn main(argc i32, args: &[string) i32 {
 	
+}
+fn main2(: i32, argc: , args: &[string) [i32 {
+	
 }",
     );
     let mut lx = StdLexer::new(&mut session);

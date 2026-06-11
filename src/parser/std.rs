@@ -98,6 +98,9 @@ impl<'a> StdParser<'a> {
         }
         false
     }
+    fn multi_check(&mut self, kinds: &[TKind]) -> bool {
+        kinds.contains(&self.peek(0).kind)
+    }
 
     pub fn parse_type(&mut self) -> Type {
         let start = self.peek(0);
@@ -160,7 +163,7 @@ impl<'a> StdParser<'a> {
                             span!(self.file_id, current.line, current.offset, len),
                             "ident: type",
                             false,
-                            "Use correct argument declare"
+                            "Use currect argument declare"
                         )],
                         "Expected identificator, found {}",
                         current
@@ -178,7 +181,7 @@ impl<'a> StdParser<'a> {
                         span!(self.file_id, current.line, current.offset, 0),
                         ": ",
                         false,
-                        "Use correct argument declare"
+                        "Add ':' here"
                     )],
                     "Expected ':', found {}",
                     current
@@ -190,7 +193,29 @@ impl<'a> StdParser<'a> {
                     break;
                 }
             }
-            let ty = self.parse_type();
+            let ty = if !self.multi_check(&[
+                TKind::Ampersand,
+                TKind::LBracket,
+                TKind::Id("".to_string()),
+            ]) {
+                let current = self.peek(0);
+                expected!(
+                    self,
+                    current,
+                    vec![],
+                    vec![help!(
+                        span!(self.file_id, current.line, current.offset, 0),
+                        "type",
+                        false,
+                        "Add argument type here"
+                    )],
+                    "Expected type (identificator)/pointer (&)/array ([type]), found {}",
+                    current
+                );
+                Type::Unknown
+            } else {
+                self.parse_type()
+            };
             args.push((id, ty));
             self.check(TKind::Comma);
         }
