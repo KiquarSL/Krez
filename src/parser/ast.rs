@@ -11,6 +11,8 @@ pub enum Stmt {
     Func(String, Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
     IfElse(Vec<(Option<Expr>, Vec<Stmt>)>),
     Return(Option<Expr>),
+    Break,
+    Continue,
     Expr(Expr),
 }
 
@@ -80,6 +82,8 @@ impl fmt::Display for Stmt {
                 Some(val) => format!("ret {val};"),
                 None => "ret;".to_string(),
             },
+            Stmt::Break => String::from("break;"),
+            Stmt::Continue => String::from("continue;"),
         };
         write!(f, "{s}")
     }

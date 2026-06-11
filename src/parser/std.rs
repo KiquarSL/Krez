@@ -389,6 +389,8 @@ enum StmtKind {
     Assign,
     While,
     Return,
+    Break,
+    Continue,
     Expr,
 }
 
@@ -411,6 +413,8 @@ fn define(pr: &StdParser) -> StmtKind {
             | TKind::AssignStar,
         ) => StmtKind::Assign,
         (TKind::Star, TKind::Id(_)) => StmtKind::Assign,
+        (TKind::Keyword(Keyword::Break), _) => StmtKind::Break,
+        (TKind::Keyword(Keyword::Continue), _) => StmtKind::Continue,
         _ => StmtKind::Expr,
     }
 }
@@ -424,8 +428,84 @@ impl<'a> StdParser<'a> {
             StmtKind::Fn => self.stmt_fn(),
             StmtKind::IfElse => self.stmt_if_else(),
             StmtKind::Return => self.stmt_return(),
-            _ => Stmt::Expr(self.expr()?),
+            StmtKind::Break | StmtKind::Continue => self.stmt_break_continue(),
+            StmtKind::While => self.stmt_while_loop(),
         })
+    }
+
+    fn stmt_break_continue(&mut self) -> Stmt {
+        let stmt = match self.peek(0).kind {
+            TKind::Keyword(kw) => {
+                if kw == Keyword::Break {
+                    Stmt::Break
+                } else {
+                    Stmt::Continue
+                }
+            }
+            _ => unreachable!(),
+        };
+        self.advance(1);
+        if !self.check(TKind::Semicolon) {
+            let semicolon = self.peek(0);
+            let new = self.back_peek(1);
+            emit_error!(
+                self,
+                semicolon,
+                vec![],
+                vec![help!(
+                    span!(self.file_id, new.line, new.offset + new.len, 0),
+                    ";",
+                    false,
+                    "Add ';' here"
+                )],
+                "Expected ';', found {}",
+                semicolon
+            );
+        }
+        stmt
+    }
+
+    fn stmt_while_loop(&mut self) -> Stmt {
+        self.advance(1);
+        let cond = match self.expr() {
+            Ok(val) => val,
+            Err(_) => Expr::Invalid,
+        };
+        if !self.check(TKind::LBrace) {
+            let lbrace = self.peek(0);
+            emit_error!(
+                self,
+                lbrace,
+                vec![],
+                vec![help!(
+                    span!(self.file_id, lbrace.line, lbrace.offset, 0),
+                    "{",
+                    false,
+                    "Add '{{' here"
+                )],
+                "Expected '{{', found {}",
+                lbrace
+            );
+            return Stmt::While(cond, vec![]);
+        }
+        let body = self.parse_body();
+        if !self.check(TKind::RBrace) {
+            let rbrace = self.peek(0);
+            emit_error!(
+                self,
+                rbrace,
+                vec![],
+                vec![help!(
+                    span!(self.file_id, rbrace.line, rbrace.offset, 0),
+                    "}}",
+                    false,
+                    "Add '}}' here"
+                )],
+                "Expected '}}', found {}",
+                rbrace
+            );
+        }
+        return Stmt::While(cond, body);
     }
 
     fn stmt_return(&mut self) -> Stmt {
@@ -488,6 +568,7 @@ impl<'a> StdParser<'a> {
                     "Expected '{{', found {}",
                     lbrace
                 );
+                break;
             }
             let body = self.parse_body();
             if !self.check(TKind::RBrace) {
