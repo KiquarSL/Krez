@@ -76,7 +76,7 @@ impl<'a> Lexer for StdLexer<'a> {
 
             match current {
                 ch if ch.is_whitespace() => self.advance(1),
-                ch if "(){}[]".contains(ch) => {
+                ch if "(){}[],".contains(ch) => {
                     self.push_one(match ch {
                         '(' => TKind::LParen,
                         ')' => TKind::RParen,
@@ -84,6 +84,7 @@ impl<'a> Lexer for StdLexer<'a> {
                         ']' => TKind::RBracket,
                         '{' => TKind::LBrace,
                         '}' => TKind::RBrace,
+                        ',' => TKind::Comma,
                         _ => unreachable!(),
                     });
                     self.advance(1);
@@ -97,7 +98,8 @@ impl<'a> Lexer for StdLexer<'a> {
                 '>' => double_token!(self, '=', Ge, Gt),
                 '<' => double_token!(self, '=', Le, Lt),
 
-                '&' => only_double_token!(self, "&&", '&', And, current),
+                '&' => double_token!(self, '&', And, Ampersand),
+                ':' => double_token!(self, ':', Path, Colon),
                 '|' => only_double_token!(self, "||", '|', Or, current),
 
                 '/' => {

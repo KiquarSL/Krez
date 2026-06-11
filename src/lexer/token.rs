@@ -19,8 +19,14 @@ pub enum TokenKind {
     Comma,
     #[strum(to_string = ".")]
     Dot,
+    #[strum(to_string = ";")]
+    Semicolon,
     #[strum(to_string = ":")]
     Colon,
+    #[strum(to_string = "::")]
+    Path,
+    #[strum(to_string = "&")]
+    Ampersand,
 
     #[strum(to_string = "=")]
     Assign,

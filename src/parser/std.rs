@@ -99,16 +99,47 @@ impl<'a> StdParser<'a> {
         false
     }
 
-    fn parse_type(&mut self) -> Type {
-        let current = self.peek(0);
-        match current.kind {
-            TKind::Id(id) => Type::from_str(&id, info!(current)),
+    pub fn parse_type(&mut self) -> Type {
+        let start = self.peek(0);
+        match start.kind {
+            TKind::Id(id) => {
+                self.advance(1);
+                Type::from_str(&id, info!(start))
+            }
+            TKind::LBracket => {
+                self.advance(1);
+                let ty = self.parse_type();
+                if !self.check(TKind::RBracket) {
+                    let current = self.peek(0);
+                    expected!(
+                        self,
+                        current,
+                        vec![],
+                        vec![help!(
+                            span!(self.file_id, current.line, current.offset, 0),
+                            "]",
+                            false,
+                            "Add ']' here"
+                        )],
+                        "Expected ']', found {}",
+                        current
+                    );
+                }
+                let tyi = ty.info();
+                Type::Array(Box::new(ty), info!(tyi.line, tyi.offset - 1, tyi.len + 2))
+            }
+            TKind::Ampersand => {
+                self.advance(1);
+                let ty = self.parse_type();
+                let tyi = ty.info();
+                Type::Ptr(Box::new(ty), info!(tyi.line, tyi.offset - 1, tyi.len + 1))
+            }
             _ => Type::Unknown,
         }
     }
-    fn parse_args(&mut self) -> Vec<(String, Type)> {
+    pub fn parse_fn_args(&mut self) -> Vec<(String, Type)> {
         let mut args = Vec::new();
-        while self.valid_pos() {
+        while self.valid_pos() && self.peek(0).kind != TKind::RParen {
             let current = self.peek(0);
             let id = match current.kind {
                 TKind::Id(id) => {
@@ -116,12 +147,7 @@ impl<'a> StdParser<'a> {
                     id
                 }
                 _ => {
-                    while self.valid_pos()
-                        && self.peek(0).kind != TKind::RParen
-                        && self.peek(0).kind != TKind::Comma
-                    {
-                        self.advance(1);
-                    }
+                    self.skip_until(&[TKind::RParen, TKind::Comma]);
                     let end = self.peek(0);
                     let len = end.pos - current.pos;
                     self.check(TKind::Comma);
@@ -142,8 +168,8 @@ impl<'a> StdParser<'a> {
                     continue;
                 }
             };
-            let current = self.peek(0);
             if !self.check(TKind::Colon) {
+                let current = self.peek(0);
                 expected!(
                     self,
                     current,
@@ -157,13 +183,24 @@ impl<'a> StdParser<'a> {
                     "Expected ':', found {}",
                     current
                 );
-                self.advance(1);
+                self.skip_until(&[TKind::RParen, TKind::Comma]);
+                if self.check(TKind::Comma) {
+                    continue;
+                } else {
+                    break;
+                }
             }
             let ty = self.parse_type();
             args.push((id, ty));
             self.check(TKind::Comma);
         }
         args
+    }
+
+    fn skip_until(&mut self, untils: &[TKind]) {
+        while self.valid_pos() && !untils.contains(&self.peek(0).kind) {
+            self.advance(1);
+        }
     }
 
     fn parse_body(&mut self) -> Vec<Stmt> {
@@ -337,13 +374,6 @@ impl<'a> StdParser<'a> {
                 id
             }
             _ => {
-                self.session.emit_error(diag!(
-                    Level::Error,
-                    span!(self.file_id, id),
-                    Phase::Parsing,
-                    "Expected identificator, found {}",
-                    id
-                ));
                 unexpected!(
                     self,
                     id,
@@ -364,17 +394,16 @@ impl<'a> StdParser<'a> {
                     span!(self.file_id, lparen.line, lparen.offset, 0),
                     "(",
                     false,
-                    "Add ')' here"
+                    "Add '(' here"
                 )],
-                "Expected identificator, found {}",
+                "Expected '(', found {}",
                 lparen
             );
         }
-        let args = if self.peek(0).kind == TKind::RParen {
-            self.advance(1);
+        let args = if self.check(TKind::RParen) {
             vec![]
         } else {
-            let ags = self.parse_args();
+            let ags = self.parse_fn_args();
             if !self.check(TKind::RParen) {
                 let rparen = self.peek(0);
                 expected!(
@@ -383,11 +412,11 @@ impl<'a> StdParser<'a> {
                     vec![],
                     vec![help!(
                         span!(self.file_id, rparen.line, rparen.offset, 0),
-                        "(",
+                        ")",
                         false,
                         "Add ')' here"
                     )],
-                    "Expected identificator, found {}",
+                    "Expected ')', found {}",
                     rparen
                 );
             }
