@@ -10,6 +10,7 @@ pub enum Stmt {
     While(Expr, Vec<Stmt>),
     Func(String, Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
     IfElse(Vec<(Option<Expr>, Vec<Stmt>)>),
+    Return(Option<Expr>),
     Expr(Expr),
 }
 
@@ -75,6 +76,10 @@ impl fmt::Display for Stmt {
                 }
                 buffer
             }
+            Stmt::Return(ret) => match ret {
+                Some(val) => format!("ret {val};"),
+                None => "ret;".to_string(),
+            },
         };
         write!(f, "{s}")
     }

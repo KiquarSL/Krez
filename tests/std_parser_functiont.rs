@@ -12,7 +12,7 @@ fn test_parser_function() {
         "test.kz",
         "
 fn main(argc: i32, args: &[string]) i32 {
-	
+	ret 0;
 }",
     );
     let mut lx = StdLexer::new(&mut session);
@@ -37,10 +37,10 @@ fn test_parser_function_err() {
         "test.kz",
         "
 fn main(argc i32, args: &[string) i32 {
-	
+	ret -;
 }
 fn main2(: i32, argc: , args: &[string) [i32 {
-	
+	ret 0
 }",
     );
     let mut lx = StdLexer::new(&mut session);

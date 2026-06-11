@@ -388,6 +388,7 @@ enum StmtKind {
     Declare,
     Assign,
     While,
+    Return,
     Expr,
 }
 
@@ -398,6 +399,7 @@ fn define(pr: &StdParser) -> StmtKind {
     match (token.kind, next_token.kind) {
         (TKind::Keyword(Keyword::Fix | Keyword::Mut), _) => StmtKind::Declare,
         (TKind::Keyword(Keyword::If), _) => StmtKind::IfElse,
+        (TKind::Keyword(Keyword::Ret), _) => StmtKind::Return,
         (TKind::Keyword(Keyword::Fn), _) => StmtKind::Fn,
         (TKind::Keyword(Keyword::While), _) => StmtKind::While,
         (
@@ -421,8 +423,40 @@ impl<'a> StdParser<'a> {
             StmtKind::Assign => self.stmt_assign(),
             StmtKind::Fn => self.stmt_fn(),
             StmtKind::IfElse => self.stmt_if_else(),
+            StmtKind::Return => self.stmt_return(),
             _ => Stmt::Expr(self.expr()?),
         })
+    }
+
+    fn stmt_return(&mut self) -> Stmt {
+        self.advance(1);
+        let val = if self.check(TKind::Semicolon) {
+            None
+        } else {
+            let val = match self.expr() {
+                Ok(val) => val,
+                Err(_) => Expr::Invalid,
+            };
+            if !self.check(TKind::Semicolon) {
+                let semicolon = self.peek(0);
+                let new = self.back_peek(1);
+                emit_error!(
+                    self,
+                    semicolon,
+                    vec![],
+                    vec![help!(
+                        span!(self.file_id, new.line, new.offset + new.len, 0),
+                        ";",
+                        false,
+                        "Add ';' here"
+                    )],
+                    "Expected ';', found {}",
+                    semicolon
+                );
+            }
+            Some(val)
+        };
+        Stmt::Return(val)
     }
 
     fn stmt_if_else(&mut self) -> Stmt {
