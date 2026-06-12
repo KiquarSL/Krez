@@ -8,12 +8,46 @@ pub enum Stmt {
     Declare(MutKind, String, Type, Expr),
     Assign(bool, String, AssignOp, Expr),
     While(Expr, Vec<Stmt>),
-    Func(String, Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
+    Func(bool, String, Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
     IfElse(Vec<(Option<Expr>, Vec<Stmt>)>),
     Return(Option<Expr>),
     Break,
     Continue,
     Expr(Expr),
+    Use(UseNode),
+}
+
+#[derive(Debug)]
+pub enum UseNode {
+    Invalid,
+    Path(String),
+    Chain(Vec<UseNode>),
+    Join(Vec<UseNode>),
+}
+
+impl fmt::Display for UseNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                UseNode::Path(path) => path.clone(),
+                UseNode::Chain(path) => path
+                    .iter()
+                    .map(|node| node.to_string())
+                    .collect::<Vec<_>>()
+                    .join("::"),
+                UseNode::Join(path) => format!(
+                    "::{{ {} }}",
+                    path.iter()
+                        .map(|node| node.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+                Self::Invalid => String::from("INVALID"),
+            }
+        )
+    }
 }
 
 impl fmt::Display for Stmt {
@@ -34,12 +68,16 @@ impl fmt::Display for Stmt {
                     .join("\n");
                 format!("{head}\n{body}\n}}")
             }
-            Stmt::Func(id, args, ret, body) => {
+            Stmt::Func(is_pub, id, args, ret, body) => {
+                let pub_str = if *is_pub { "pub " } else { "" };
                 let ret_ty = match ret {
                     Some(ty) => ty.to_string(),
                     None => "".to_string(),
                 };
-                let head = format!("fn {id}({}) {ret_ty} {{", display_args(args.to_vec()),);
+                let head = format!(
+                    "{pub_str}fn {id}({}) {ret_ty} {{",
+                    display_args(args.to_vec()),
+                );
                 let body = body
                     .iter()
                     .map(|stmt| format!("    {stmt}"))
@@ -84,6 +122,7 @@ impl fmt::Display for Stmt {
             },
             Stmt::Break => String::from("break;"),
             Stmt::Continue => String::from("continue;"),
+            Stmt::Use(node) => format!("use {};", node.to_string()),
         };
         write!(f, "{s}")
     }

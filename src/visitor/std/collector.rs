@@ -1,25 +1,40 @@
-use crate::compiler::KrezCompilerApi;
+use crate::compiler::{FuncInfo, KrezCompilerApi};
 use crate::parser::Info;
 use crate::parser::ast::{AssignOp, MutKind, Stmt};
 use crate::parser::expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp};
 use crate::parser::types::Type;
 use crate::visitor::{TypeChecker, Visitor};
 
-pub struct StdTypeChecker {}
+pub struct StdCollector {}
 
-impl StdTypeChecker {
+impl StdCollector {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl TypeChecker for StdTypeChecker {}
+impl TypeChecker for StdCollector {}
 
-impl Visitor for StdTypeChecker {
+impl Visitor for StdCollector {
     type Result = Type;
 
-    fn run(&mut self, _api: &mut KrezCompilerApi) {
-        todo!()
+    fn run(&mut self, api: &mut KrezCompilerApi) {
+        for (file_id, ast) in &mut *api.ast {
+            for stmt in ast {
+                if let Stmt::Func(is_pub, id, args, ret_ty, body) = stmt {
+                    if !*is_pub {
+                        continue;
+                    }
+                    let mangled = "f".to_owned() + &api.session.new_mangle_func().to_string();
+                    let args = args.iter().map(|(_id, ty)| ty.clone()).collect::<Vec<_>>();
+                    api.modules
+                        .get_mut(file_id)
+                        .unwrap()
+                        .pub_func
+                        .push(FuncInfo::new(id.to_string(), mangled, args, ret_ty.clone()));
+                }
+            }
+        }
     }
 
     fn visit_expr(&mut self, expr: &Expr) -> Self::Result {

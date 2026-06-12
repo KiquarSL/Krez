@@ -134,6 +134,12 @@ impl PartialEq for TokenKind {
 /// Enum for typing in TokenType
 #[derive(Debug, Clone, strum::Display, strum::EnumString)]
 pub enum Keyword {
+    /// pub
+    #[strum(to_string = "pub")]
+    Pub,
+    /// pub
+    #[strum(to_string = "use")]
+    Use,
     /// fn
     #[strum(to_string = "fn")]
     Fn,
@@ -200,9 +206,10 @@ impl Token {
     # Examples
 
     ```
+    use krez::lexer::token::{Token, TKind, Keyword};
     // If source: fix a = 4;
     let fix = Token::new(TKind::Keyword(Keyword::Fix), 0, 0, 0, 3);
-    let ident = Token::new(TKind::id("a"), 0, 4, 4, 1);
+    let ident = Token::new(TKind::Id("a"), 0, 4, 4, 1);
     let assign = Token::new(TKind::Assign, 0, 6, 6, 1);
     ```
     */

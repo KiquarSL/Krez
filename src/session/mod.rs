@@ -8,6 +8,8 @@ pub struct Session {
     source_map: SourceMap,
     reporter: Box<dyn Reporter>,
     has_error: bool,
+
+    mangle_func_count: usize,
 }
 
 impl Session {
@@ -17,7 +19,14 @@ impl Session {
             source_map: SourceMap { sources: vec![] },
             diagnostics: vec![],
             has_error: false,
+            mangle_func_count: 0,
         }
+    }
+
+    pub fn new_mangle_func(&mut self) -> usize {
+        let mangle = self.mangle_func_count;
+        self.mangle_func_count += 1;
+        mangle
     }
 
     pub fn push_source(&mut self, source: Source) {

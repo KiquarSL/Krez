@@ -1,6 +1,6 @@
 use crate::backend::Backend;
 use crate::lexer::Lexer;
-use crate::parser::{Parser, ast::Stmt};
+use crate::parser::{Parser, ast::Stmt, types::Type};
 use crate::session::{
     Session,
     source::{FileId, Source},
@@ -12,26 +12,28 @@ use std::fs;
 use std::path::Path;
 use std::rc::Rc;
 
-pub struct KrezCompiler<'a, O> {
+pub struct KrezCompiler<O> {
     lexer: Box<dyn Lexer>,
     parser: Box<dyn Parser>,
     backend: Box<dyn Backend<Output = O>>,
     session: Rc<RefCell<Session>>,
-    build_dir: &'a str,
+    build_dir: String,
 
     ast: HashMap<FileId, Vec<Stmt>>,
+    modules: HashMap<FileId, Module>,
+
     analyzers: Vec<Box<dyn Analyzer>>,
     type_checkers: Vec<Box<dyn TypeChecker>>,
     optimizers: Vec<Box<dyn Optimizer>>,
 }
 
-impl<'a, O> KrezCompiler<'a, O> {
+impl<O> KrezCompiler<O> {
     pub fn new(
         lexer: Box<dyn Lexer>,
         parser: Box<dyn Parser>,
         backend: Box<dyn Backend<Output = O>>,
         session: Session,
-        build_dir: &'a str,
+        build_dir: String,
         analyzers: Vec<Box<dyn Analyzer>>,
         type_checkers: Vec<Box<dyn TypeChecker>>,
         optimizers: Vec<Box<dyn Optimizer>>,
@@ -46,6 +48,7 @@ impl<'a, O> KrezCompiler<'a, O> {
             optimizers,
             type_checkers,
             ast: HashMap::new(),
+            modules: HashMap::new(),
         }
     }
 
@@ -71,6 +74,7 @@ impl<'a, O> KrezCompiler<'a, O> {
         let mut api = KrezCompilerApi {
             session: &mut self.session.borrow_mut(),
             ast: &mut self.ast,
+            modules: &mut self.modules,
         };
         for analyzer in &mut self.analyzers {
             analyzer.run(&mut api);
@@ -110,7 +114,33 @@ impl<'a, O> KrezCompiler<'a, O> {
     }
 }
 
+pub struct Module {
+    pub id: String,
+    pub pub_func: Vec<FuncInfo>,
+}
+
+pub struct FuncInfo {
+    /// Original function identificator
+    pub id: String,
+    /// Mangled function identificator. Example: f1, f2, f(n)...
+    pub id_mangled: String,
+    pub args: Vec<Type>,
+    pub ret_ty: Option<Type>,
+}
+
+impl FuncInfo {
+    pub fn new(id: String, id_mangled: String, args: Vec<Type>, ret_ty: Option<Type>) -> Self {
+        Self {
+            id,
+            args,
+            id_mangled,
+            ret_ty,
+        }
+    }
+}
+
 pub struct KrezCompilerApi<'a> {
     pub ast: &'a mut HashMap<FileId, Vec<Stmt>>,
     pub session: &'a mut Session,
+    pub modules: &'a mut HashMap<FileId, Module>,
 }
