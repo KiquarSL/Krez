@@ -1,11 +1,11 @@
 use crate::backend::Backend;
 use crate::lexer::Lexer;
 use crate::parser::{Parser, ast::Stmt, types::Type};
+use crate::plugin::Plugin;
 use crate::session::{
     Session,
     source::{FileId, Source},
 };
-use crate::visitor::{Analyzer, Optimizer, TypeChecker, Visitor};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
@@ -21,10 +21,7 @@ pub struct KrezCompiler<O> {
 
     ast: HashMap<FileId, Vec<Stmt>>,
     modules: HashMap<FileId, Module>,
-
-    analyzers: Vec<Box<dyn Analyzer>>,
-    type_checkers: Vec<Box<dyn TypeChecker>>,
-    optimizers: Vec<Box<dyn Optimizer>>,
+    plugins: Vec<Box<dyn Plugin>>,
 }
 
 impl<O> KrezCompiler<O> {
@@ -34,9 +31,7 @@ impl<O> KrezCompiler<O> {
         backend: Box<dyn Backend<Output = O>>,
         session: Session,
         build_dir: String,
-        analyzers: Vec<Box<dyn Analyzer>>,
-        type_checkers: Vec<Box<dyn TypeChecker>>,
-        optimizers: Vec<Box<dyn Optimizer>>,
+        plugins: Vec<Box<dyn Plugin>>,
     ) -> Self {
         Self {
             session: Rc::new(RefCell::new(session)),
@@ -44,14 +39,25 @@ impl<O> KrezCompiler<O> {
             backend,
             build_dir,
             parser,
-            analyzers,
-            optimizers,
-            type_checkers,
+            plugins,
             ast: HashMap::new(),
             modules: HashMap::new(),
         }
     }
-
+    /* !TODO
+        pub fn default(build_dir: String, verbose: Verbose) -> Self {
+            let reporter = StdReporter::new(verbose);
+            let session = Session::new(Box::new(reporter));
+            Self::new(
+                Box::new(StdLexer::new(&mut session)),
+                Box::new(StdParser::new(&mut session)),
+                backend,
+                session,
+                build_dir,
+                vec![],
+            )
+        }
+    */
     pub fn compile(&mut self, files: Vec<String>) -> std::io::Result<()> {
         for path in files {
             let text = fs::read_to_string(&path)?;
@@ -60,6 +66,14 @@ impl<O> KrezCompiler<O> {
         }
         for (file_id, _source) in self.session.borrow().sources().iter().enumerate() {
             let tokens = self.lexer.tokenize(file_id);
+            self.modules.insert(
+                file_id,
+                Module {
+                    id: file_id.to_string(),
+                    pub_func: vec![],
+                    pub_uses: vec![],
+                },
+            );
             if self.session.borrow().has_error() {
                 self.session.borrow().show_errors();
                 return Ok(());
@@ -71,32 +85,20 @@ impl<O> KrezCompiler<O> {
                 return Ok(());
             }
         }
+
         let mut api = KrezCompilerApi {
             session: &mut self.session.borrow_mut(),
             ast: &mut self.ast,
             modules: &mut self.modules,
         };
-        for analyzer in &mut self.analyzers {
-            analyzer.run(&mut api);
+        for plugin in &mut self.plugins {
+            plugin.run(&mut api);
         }
         if self.session.borrow().has_error() {
             self.session.borrow().show_errors();
             return Ok(());
         }
-        for type_checker in &mut self.type_checkers {
-            type_checker.run(&mut api);
-        }
-        if self.session.borrow().has_error() {
-            self.session.borrow().show_errors();
-            return Ok(());
-        }
-        for optimizer in &mut self.optimizers {
-            optimizer.run(&mut api);
-        }
-        if self.session.borrow().has_error() {
-            self.session.borrow().show_errors();
-            return Ok(());
-        }
+
         let session = &self.session.borrow();
         let sources = session.sources();
         for (file_id, _ast) in &self.ast {
@@ -114,11 +116,14 @@ impl<O> KrezCompiler<O> {
     }
 }
 
+#[derive(Debug)]
 pub struct Module {
     pub id: String,
     pub pub_func: Vec<FuncInfo>,
+    pub pub_uses: Vec<String>,
 }
 
+#[derive(Debug)]
 pub struct FuncInfo {
     /// Original function identificator
     pub id: String,

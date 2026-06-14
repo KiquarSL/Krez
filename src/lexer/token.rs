@@ -209,7 +209,7 @@ impl Token {
     use krez::lexer::token::{Token, TKind, Keyword};
     // If source: fix a = 4;
     let fix = Token::new(TKind::Keyword(Keyword::Fix), 0, 0, 0, 3);
-    let ident = Token::new(TKind::Id("a"), 0, 4, 4, 1);
+    let ident = Token::new(TKind::Id("a".to_string()), 0, 4, 4, 1);
     let assign = Token::new(TKind::Assign, 0, 6, 6, 1);
     ```
     */

@@ -8,10 +8,12 @@ use crate::parser::{
     types::Type,
 };
 
+pub trait Plugin {
+    fn run(&mut self, api: &mut KrezCompilerApi);
+}
+
 pub trait Visitor {
     type Result;
-
-    fn run(&mut self, api: &mut KrezCompilerApi);
 
     fn visit_expr(&mut self, expr: &Expr) -> Self::Result;
     fn visit_str(&mut self, s: &str, info: &Info) -> Self::Result;
@@ -51,7 +53,3 @@ pub trait Visitor {
     fn visit_break(&mut self);
     fn visit_continue(&mut self);
 }
-
-pub trait TypeChecker: Visitor<Result = Type> {}
-pub trait Optimizer: Visitor<Result = Vec<Stmt>> {}
-pub trait Analyzer: Visitor<Result = ()> {}

@@ -1,6 +1,6 @@
 use super::{
     Parser,
-    ast::{AssignOp, MutKind, Stmt, UseNode},
+    ast::{AssignOp, MutKind, Stmt, UseItem},
     expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp},
     types::Type,
 };
@@ -227,56 +227,24 @@ impl<'a> StdParser<'a> {
         args
     }
 
-    fn parse_use_path(&mut self) -> UseNode {
-        match self.peek(0).kind {
-            TKind::Id(id) => {
-                let mut path = vec![UseNode::Path(id)];
-                self.advance(1);
-                while self.valid_pos() && self.check(TKind::Path) {
-                    path.push(self.parse_use_path());
+    /// Parse path: a::b::c
+    fn parse_path(&mut self) -> Vec<UseItem> {
+        let mut path = vec![];
+        while self.valid_pos() {
+            let token = self.peek(0);
+            match token.kind {
+                TKind::Id(id) => {
+                    self.advance(1);
+                    path.push(UseItem::Path(id));
                 }
-                UseNode::Chain(path)
-            }
-            TKind::LBrace => {
-                self.advance(1);
-                let mut path = vec![];
-                while self.valid_pos() {
-                    path.push(self.parse_use_path());
-                    if !self.check(TKind::Comma) {
-                        break;
-                    }
+                TKind::Path => {
+                    self.advance(1);
+                    continue;
                 }
-                if !self.check(TKind::RBrace) {
-                    let lbrace = self.peek(0);
-                    emit_error!(
-                        self,
-                        lbrace,
-                        vec![],
-                        vec![help!(
-                            span!(self.file_id, lbrace.line, lbrace.offset, 0),
-                            "}",
-                            false,
-                            "Add '}}' here"
-                        )],
-                        "Expected '}}', found {}",
-                        lbrace
-                    );
-                }
-                UseNode::Join(path)
-            }
-            _ => {
-                let fragment = self.peek(0);
-                emit_error!(
-                    self,
-                    fragment,
-                    vec![],
-                    vec![],
-                    "Expected 'path' or ::{{paths}}, found {}",
-                    fragment
-                );
-                UseNode::Invalid
+                _ => break,
             }
         }
+        path
     }
 
     fn skip_until(&mut self, untils: &[TKind]) {
@@ -511,7 +479,8 @@ fn define(pr: &StdParser) -> StmtKind {
         (TKind::Star, TKind::Id(_)) => StmtKind::Assign,
         (TKind::Keyword(Keyword::Break), _) => StmtKind::Break,
         (TKind::Keyword(Keyword::Continue), _) => StmtKind::Continue,
-        (TKind::Keyword(Keyword::Use), _) => StmtKind::Use,
+        (TKind::Keyword(Keyword::Use), _)
+        | (TKind::Keyword(Keyword::Pub), TKind::Keyword(Keyword::Use)) => StmtKind::Use,
         _ => StmtKind::Expr,
     }
 }
@@ -564,8 +533,14 @@ impl<'a> StdParser<'a> {
     }
 
     fn stmt_use(&mut self) -> Stmt {
+        let is_pub = if let TKind::Keyword(Keyword::Pub) = self.peek(0).kind {
+            self.advance(1);
+            true
+        } else {
+            false
+        };
         self.advance(1);
-        let path = self.parse_use_path();
+        let path = vec![self.parse_path()];
         if !self.check(TKind::Semicolon) {
             let semicolon = self.peek(0);
             let new = self.back_peek(1);
@@ -583,7 +558,7 @@ impl<'a> StdParser<'a> {
                 semicolon
             );
         }
-        Stmt::Use(path)
+        Stmt::Use(is_pub, path)
     }
 
     fn stmt_while_loop(&mut self) -> Stmt {

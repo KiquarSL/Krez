@@ -14,37 +14,21 @@ pub enum Stmt {
     Break,
     Continue,
     Expr(Expr),
-    Use(UseNode),
+    Use(bool, Vec<Vec<UseItem>>),
 }
 
-#[derive(Debug)]
-pub enum UseNode {
-    Invalid,
+#[derive(Debug, Clone)]
+pub enum UseItem {
     Path(String),
-    Chain(Vec<UseNode>),
-    Join(Vec<UseNode>),
 }
 
-impl fmt::Display for UseNode {
+impl fmt::Display for UseItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                UseNode::Path(path) => path.clone(),
-                UseNode::Chain(path) => path
-                    .iter()
-                    .map(|node| node.to_string())
-                    .collect::<Vec<_>>()
-                    .join("::"),
-                UseNode::Join(path) => format!(
-                    "::{{ {} }}",
-                    path.iter()
-                        .map(|node| node.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ),
-                Self::Invalid => String::from("INVALID"),
+                Self::Path(path) => path.clone(),
             }
         )
     }
@@ -122,7 +106,21 @@ impl fmt::Display for Stmt {
             },
             Stmt::Break => String::from("break;"),
             Stmt::Continue => String::from("continue;"),
-            Stmt::Use(node) => format!("use {};", node.to_string()),
+            Stmt::Use(is_pub, items) => format!(
+                "{}",
+                items
+                    .iter()
+                    .map(|i| format!(
+                        "{}use {};",
+                        if *is_pub { "pub " } else { "" },
+                        i.iter()
+                            .map(|it| it.to_string())
+                            .collect::<Vec<_>>()
+                            .join("::")
+                    ))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
         };
         write!(f, "{s}")
     }
