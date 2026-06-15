@@ -3,35 +3,53 @@ use super::types::{Type, display_args};
 use std::fmt;
 use strum;
 
+/// Keeping statement kind and information for compilation
 #[derive(Debug)]
 pub enum Stmt {
+    /** # Fields
+    1. Kind mutable (Mut or Fix)
+    2. Identificator
+    3. Variable data type
+    4. Value for assign
+    */
     Declare(MutKind, String, Type, Expr),
+    /** # Fields
+    1. Is dereference (*name)
+    2. Identificator
+    3. Assign operation type
+    4. Value for assign
+    */
     Assign(bool, String, AssignOp, Expr),
+    /** # Fields
+    1. Condition
+    2. Body
+    */
     While(Expr, Vec<Stmt>),
+    /** # Fields
+    1. Is public (Visibility in other modules)
+    2. Identifucator
+    3. Arguments (Identificator, Type)
+    4. Return type (Type or None)
+    5. Body
+    */
     Func(bool, String, Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
+    /** Keep vector of condition and body
+    If condition is None, its else block
+    */
     IfElse(Vec<(Option<Expr>, Vec<Stmt>)>),
+    /** # Fields
+    1. Is public use
+    3. Pathes (a::b::c, a::b::d)
+    */
+    Use(bool, Vec<Vec<String>>),
+    /// Keep return value of None
     Return(Option<Expr>),
-    Break,
-    Continue,
+    /// Call functions and other expressions
     Expr(Expr),
-    Use(bool, Vec<Vec<UseItem>>),
-}
-
-#[derive(Debug, Clone)]
-pub enum UseItem {
-    Path(String),
-}
-
-impl fmt::Display for UseItem {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Path(path) => path.clone(),
-            }
-        )
-    }
+    /// Break current loop
+    Break,
+    /// Continue current loop
+    Continue,
 }
 
 impl fmt::Display for Stmt {
@@ -126,10 +144,13 @@ impl fmt::Display for Stmt {
     }
 }
 
+/// Variable muttable type
 #[derive(Debug, strum::Display)]
 pub enum MutKind {
+    /// Keyword: mut
     #[strum(to_string = "mut")]
     Mutable,
+    /// Keyword: fix
     #[strum(to_string = "fix")]
     Fixed,
 }

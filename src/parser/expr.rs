@@ -3,6 +3,8 @@ use strum::Display;
 
 pub type BExpr = Box<Expr>;
 
+/// Using for keeping expressions for AST
+/// Keep value and informarion of position
 #[derive(Debug, Clone)]
 pub enum Expr {
     Invalid,
@@ -74,46 +76,65 @@ impl Expr {
         }
     }
 }
+
+/// Arithmetic operator type
 #[derive(Debug, Clone, Display)]
 pub enum ArithOp {
+    /// +
     #[strum(to_string = "+")]
     Add,
+    /// -
     #[strum(to_string = "-")]
     Sub,
+    /// *
     #[strum(to_string = "*")]
     Mul,
+    /// /
     #[strum(to_string = "/")]
     Div,
 }
 
+/// Comparison operator type
 #[derive(Debug, Clone, Display)]
 pub enum CompOp {
+    /// >
     #[strum(to_string = ">")]
     Gt,
+    /// >=
     #[strum(to_string = ">=")]
     Ge,
+    /// <
     #[strum(to_string = "<")]
     Lt,
+    /// <=
     #[strum(to_string = "<=")]
     Le,
+    /// ==
     #[strum(to_string = "==")]
     Eq,
+    /// !=
     #[strum(to_string = "!=")]
     Ne,
 }
 
+/// Logical operator type
 #[derive(Debug, Clone, Display)]
 pub enum LogicOp {
+    /// &&
     #[strum(to_string = "&&")]
     And,
+    /// ||
     #[strum(to_string = "||")]
     Or,
 }
 
+/// Unary operator type
 #[derive(Debug, Clone, Display)]
 pub enum UnaryOp {
+    /// !
     #[strum(to_string = "!")]
     Not,
+    /// -
     #[strum(to_string = "-")]
     Neg,
 }

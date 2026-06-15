@@ -1,6 +1,6 @@
 use super::{
     Parser,
-    ast::{AssignOp, MutKind, Stmt, UseItem},
+    ast::{AssignOp, MutKind, Stmt},
     expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp},
     types::Type,
 };
@@ -228,14 +228,14 @@ impl<'a> StdParser<'a> {
     }
 
     /// Parse path: a::b::c
-    fn parse_path(&mut self) -> Vec<UseItem> {
+    fn parse_path(&mut self) -> Vec<String> {
         let mut path = vec![];
         while self.valid_pos() {
             let token = self.peek(0);
             match token.kind {
                 TKind::Id(id) => {
                     self.advance(1);
-                    path.push(UseItem::Path(id));
+                    path.push(id);
                 }
                 TKind::Path => {
                     self.advance(1);
@@ -369,18 +369,8 @@ impl<'a> StdParser<'a> {
                 self.advance(1);
                 Ok(Expr::Str(s, info!(token)))
             }
-            TKind::Id(id) => {
-                let mut path = vec![id];
-                self.advance(1);
-                while self.valid_pos() {
-                    if !self.check(TKind::Path) {
-                        break;
-                    }
-                    if let TKind::Id(id) = self.peek(0).kind {
-                        path.push(id);
-                        self.advance(1);
-                    }
-                }
+            TKind::Id(_id) => {
+                let path = self.parse_path();
                 let end = self.peek(0);
                 if self.check(TKind::LParen) {
                     let args = self.parse_args();

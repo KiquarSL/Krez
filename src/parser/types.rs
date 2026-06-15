@@ -1,6 +1,8 @@
 use super::Info;
 use std::fmt;
 
+/// All Krez data types
+/// Keeping information of position for show errors
 #[derive(Debug, Clone, Default)]
 pub enum Type {
     #[default]
@@ -31,6 +33,8 @@ impl fmt::Display for Type {
     }
 }
 
+/// Build Vec<(String, Type)> (Id, Type) to string
+/// Example: a: i32, b: bool, c: CustomType
 pub fn display_args(args: Vec<(String, Type)>) -> String {
     args.iter()
         .map(|(id, ty)| format!("{id}: {ty}"))
@@ -39,6 +43,7 @@ pub fn display_args(args: Vec<(String, Type)>) -> String {
 }
 
 impl Type {
+    /// Copy Info from type
     pub fn info(&self) -> Info {
         match self {
             Type::Str(info)
