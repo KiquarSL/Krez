@@ -29,10 +29,10 @@ pub enum Stmt {
     1. Is public (Visibility in other modules)
     2. Identifucator
     3. Arguments (Identificator, Type)
-    4. Return type (Type or None)
+    4. Return type
     5. Body
     */
-    Func(bool, String, Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
+    Func(bool, String, Vec<(String, Type)>, Type, Vec<Stmt>),
     /** Keep vector of condition and body
     If condition is None, its else block
     */
@@ -72,14 +72,7 @@ impl fmt::Display for Stmt {
             }
             Stmt::Func(is_pub, id, args, ret, body) => {
                 let pub_str = if *is_pub { "pub " } else { "" };
-                let ret_ty = match ret {
-                    Some(ty) => ty.to_string(),
-                    None => "".to_string(),
-                };
-                let head = format!(
-                    "{pub_str}fn {id}({}) {ret_ty} {{",
-                    display_args(args.to_vec()),
-                );
+                let head = format!("{pub_str}fn {id}({}) {ret} {{", display_args(args.to_vec()),);
                 let body = body
                     .iter()
                     .map(|stmt| format!("    {stmt}"))

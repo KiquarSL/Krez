@@ -6,14 +6,14 @@ use source::{Source, SourceMap};
 pub struct Session {
     diagnostics: Vec<Diagnostic>,
     source_map: SourceMap,
-    reporter: Box<dyn Reporter>,
+    reporter: Option<Box<dyn Reporter>>,
     has_error: bool,
 
     mangle_func_count: usize,
 }
 
 impl Session {
-    pub fn new(reporter: Box<dyn Reporter>) -> Self {
+    pub fn new(reporter: Option<Box<dyn Reporter>>) -> Self {
         Self {
             reporter,
             source_map: SourceMap { sources: vec![] },
@@ -58,7 +58,10 @@ impl Session {
 
     pub fn show_errors(&self) {
         for diag in &self.diagnostics {
-            self.reporter.emit(diag, &self.source_map);
+            match &self.reporter {
+                Some(rep) => rep.emit(diag, &self.source_map),
+                None => {}
+            }
         }
     }
 }

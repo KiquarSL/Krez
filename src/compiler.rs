@@ -1,7 +1,8 @@
-use crate::backend::Backend;
-use crate::lexer::Lexer;
-use crate::parser::{Parser, ast::Stmt, types::Type};
+use crate::backend::{Backend, qbe::QbeBackend};
+use crate::lexer::{Lexer, std::StdLexer};
+use crate::parser::{Parser, ast::Stmt, std::StdParser, types::Type};
 use crate::plugin::Plugin;
+use crate::report::std::{StdReporter, Verbose};
 use crate::session::{
     Session,
     source::{FileId, Source},
@@ -12,10 +13,10 @@ use std::fs;
 use std::path::Path;
 use std::rc::Rc;
 
-pub struct KrezCompiler<O> {
+pub struct KrezCompiler {
     lexer: Box<dyn Lexer>,
     parser: Box<dyn Parser>,
-    backend: Box<dyn Backend<Output = O>>,
+    backend: Box<dyn Backend>,
     session: Rc<RefCell<Session>>,
     build_dir: String,
 
@@ -24,17 +25,17 @@ pub struct KrezCompiler<O> {
     plugins: Vec<Box<dyn Plugin>>,
 }
 
-impl<O> KrezCompiler<O> {
+impl KrezCompiler {
     pub fn new(
         lexer: Box<dyn Lexer>,
         parser: Box<dyn Parser>,
-        backend: Box<dyn Backend<Output = O>>,
-        session: Session,
+        backend: Box<dyn Backend>,
+        session: Rc<RefCell<Session>>,
         build_dir: String,
         plugins: Vec<Box<dyn Plugin>>,
     ) -> Self {
         Self {
-            session: Rc::new(RefCell::new(session)),
+            session,
             lexer,
             backend,
             build_dir,
@@ -44,20 +45,25 @@ impl<O> KrezCompiler<O> {
             modules: HashMap::new(),
         }
     }
-    /* !TODO
-        pub fn default(build_dir: String, verbose: Verbose) -> Self {
-            let reporter = StdReporter::new(verbose);
-            let session = Session::new(Box::new(reporter));
-            Self::new(
-                Box::new(StdLexer::new(&mut session)),
-                Box::new(StdParser::new(&mut session)),
-                backend,
-                session,
-                build_dir,
-                vec![],
-            )
-        }
-    */
+
+    pub fn default(build_dir: String, verbose: Verbose) -> Self {
+        let reporter = StdReporter::new(verbose);
+        let session = Rc::new(RefCell::new(Session::new(Some(Box::new(reporter)))));
+
+        let lexer = StdLexer::new(session.clone());
+        let parser = StdParser::new(session.clone());
+        let backend = QbeBackend::new(session.clone());
+
+        Self::new(
+            Box::new(lexer),
+            Box::new(parser),
+            Box::new(backend),
+            session,
+            build_dir,
+            vec![],
+        )
+    }
+
     pub fn compile(&mut self, files: Vec<String>) -> std::io::Result<()> {
         for path in files {
             let text = fs::read_to_string(&path)?;
@@ -98,19 +104,18 @@ impl<O> KrezCompiler<O> {
             self.session.borrow().show_errors();
             return Ok(());
         }
-
-        let session = &self.session.borrow();
-        let sources = session.sources();
-        for (file_id, _ast) in &self.ast {
-            let output = self.backend.compile(&self.ast[&file_id]);
+        let sess = &self.session.borrow();
+        let sources = sess.sources();
+        for (file_id, ast) in &self.ast {
+            let output = self.backend.compile(*file_id, ast);
             if self.session.borrow().has_error() {
                 self.session.borrow().show_errors();
                 return Ok(());
             }
             let source = &sources[*file_id];
             let name = source.name.clone() + &self.backend.ext();
-            self.backend
-                .write(&output, Path::new(&(self.build_dir.to_owned() + &name)))?;
+            let path = &(self.build_dir.clone() + &name);
+            output.write(Path::new(path))?;
         }
         Ok(())
     }
@@ -129,7 +134,9 @@ pub struct FuncInfo {
     pub id: String,
     /// Mangled function identificator. Example: f1, f2, f(n)...
     pub id_mangled: String,
+    /// Argument types
     pub args: Vec<Type>,
+    /// Return type: Type or None
     pub ret_ty: Option<Type>,
 }
 

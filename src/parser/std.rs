@@ -5,13 +5,14 @@ use super::{
     types::Type,
 };
 use crate::lexer::token::{Keyword, TKind, Token};
-use crate::report::{Level, Phase};
+use crate::report::{Diagnostic, Level, Phase};
 use crate::session::{Session, source::FileId};
 use crate::{diag, help, info, span};
-
+use std::cell::RefCell;
+use std::rc::Rc;
 macro_rules! emit_error {
     ($self:expr, $token:expr,$notes:expr, $helps:expr, $($msg:tt)*) => {
-        $self.session.emit_error(diag!(
+        $self.emit_error(diag!(
             Level::Error,
             span!($self.file_id, $token),
             Phase::Parsing,
@@ -22,14 +23,14 @@ macro_rules! emit_error {
     };
 }
 
-pub struct StdParser<'a> {
+pub struct StdParser {
     tokens: Vec<Token>,
     index: usize,
-    session: &'a mut Session,
+    session: Rc<RefCell<Session>>,
     file_id: FileId,
 }
 
-impl<'a> Parser for StdParser<'a> {
+impl Parser for StdParser {
     fn parse(&mut self, tokens: Vec<Token>, file_id: FileId) -> Vec<Stmt> {
         self.file_id = file_id;
         self.tokens = tokens;
@@ -46,8 +47,8 @@ impl<'a> Parser for StdParser<'a> {
     }
 }
 
-impl<'a> StdParser<'a> {
-    pub fn new(session: &'a mut Session) -> Self {
+impl StdParser {
+    pub fn new(session: Rc<RefCell<Session>>) -> Self {
         Self {
             index: 0,
             session,
@@ -56,7 +57,7 @@ impl<'a> StdParser<'a> {
         }
     }
 
-    pub fn new_full(session: &'a mut Session, tokens: Vec<Token>, file_id: FileId) -> Self {
+    pub fn new_full(session: Rc<RefCell<Session>>, tokens: Vec<Token>, file_id: FileId) -> Self {
         Self {
             index: 0,
             session,
@@ -90,6 +91,7 @@ impl<'a> StdParser<'a> {
         }
         false
     }
+
     fn multi_check(&mut self, kinds: &[TKind]) -> bool {
         kinds.contains(&self.peek(0).kind)
     }
@@ -264,9 +266,13 @@ impl<'a> StdParser<'a> {
         }
         body
     }
+
+    fn emit_error(&mut self, diag: Diagnostic) {
+        self.session.borrow_mut().emit_error(diag);
+    }
 }
 
-impl<'a> StdParser<'a> {
+impl StdParser {
     pub fn expr(&mut self) -> Result<Expr, ()> {
         Ok(self.logical()?)
     }
@@ -421,12 +427,7 @@ impl<'a> StdParser<'a> {
                 Ok(expr)
             }
             _ => {
-                self.session.emit_error(diag!(
-                    Level::Error,
-                    span!(self.file_id, token),
-                    Phase::Parsing,
-                    "Unexpected token {token}"
-                ));
+                emit_error!(self, token, vec![], vec![], "Unexpected token {token}");
                 self.advance(1);
                 Err(())
             }
@@ -475,7 +476,7 @@ fn define(pr: &StdParser) -> StmtKind {
     }
 }
 
-impl<'a> StdParser<'a> {
+impl StdParser {
     pub fn stmt(&mut self) -> Result<Stmt, ()> {
         Ok(match define(self) {
             StmtKind::Expr => Stmt::Expr(self.expr()?),
@@ -972,9 +973,9 @@ impl<'a> StdParser<'a> {
             }
             ags
         };
-        let mut ret_ty = None;
+        let mut ret_ty = Type::Unknown;
         if self.peek(0).kind != TKind::LBrace {
-            ret_ty = Some(self.parse_type());
+            ret_ty = self.parse_type();
         }
         if !self.check(TKind::LBrace) {
             let lbrace = self.peek(0);

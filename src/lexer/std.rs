@@ -2,14 +2,16 @@ use super::{
     Lexer,
     token::{Keyword, TKind, Token},
 };
-use crate::report::{Level, Phase};
+use crate::report::{Diagnostic, Level, Phase};
 use crate::session::{
     Session,
     source::{FileId, Source},
 };
 use crate::{diag, help, span};
+use std::cell::Ref;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::str::FromStr;
-
 macro_rules! double_token {
     ($self:expr, $second:expr, $then:ident, $else:ident) => {
         if $self.peek(1) == Some($second) {
@@ -35,7 +37,7 @@ macro_rules! only_double_token {
                 "Meybe you mean `{}`?",
                 $full
             );
-            $self.session.emit_error(diag!(
+            $self.emit_error(diag!(
                 Level::Error,
                 span!($self.file_id, $self.line, $self.offset, 1),
                 Phase::Lexing,
@@ -49,21 +51,22 @@ macro_rules! only_double_token {
     };
 }
 
-pub struct StdLexer<'a> {
+pub struct StdLexer {
     pos: usize,
     file_id: FileId,
     tokens: Vec<Token>,
-    session: &'a mut Session,
+    session: Rc<RefCell<Session>>,
     chars: Vec<char>,
 
     line: usize,
     offset: usize,
 }
 
-impl<'a> Lexer for StdLexer<'a> {
+impl Lexer for StdLexer {
     fn tokenize(&mut self, file_id: FileId) -> Vec<Token> {
         self.file_id = file_id;
-        self.chars = self.src().text.chars().collect();
+        let src_text = self.src().text.clone();
+        self.chars = src_text.chars().collect();
         while self.valid_pos() {
             let current = self.peek(0);
             let current = match current {
@@ -148,7 +151,7 @@ impl<'a> Lexer for StdLexer<'a> {
                         let f = match buffer.parse::<f64>() {
                             Ok(f) => f,
                             Err(err) => {
-                                self.session.emit_error(diag!(
+                                self.emit_error(diag!(
                                     Level::Error,
                                     span!(file_id, line, offset, buffer.len()),
                                     Phase::Lexing,
@@ -162,7 +165,7 @@ impl<'a> Lexer for StdLexer<'a> {
                         let i = match buffer.parse::<i64>() {
                             Ok(f) => f,
                             Err(err) => {
-                                self.session.emit_error(diag!(
+                                self.emit_error(diag!(
                                     Level::Error,
                                     span!(file_id, line, offset, buffer.len()),
                                     Phase::Lexing,
@@ -221,7 +224,7 @@ impl<'a> Lexer for StdLexer<'a> {
                     self.push(TKind::Str(buffer), line, offset, pos, len);
                 }
                 _ => {
-                    self.session.emit_error(diag!(
+                    self.emit_error(diag!(
                         Level::Error,
                         span!(file_id, self.line, self.offset, 1),
                         Phase::Lexing,
@@ -236,8 +239,8 @@ impl<'a> Lexer for StdLexer<'a> {
     }
 }
 
-impl<'a> StdLexer<'a> {
-    pub fn new(session: &'a mut Session) -> Self {
+impl StdLexer {
+    pub fn new(session: Rc<RefCell<Session>>) -> Self {
         Self {
             file_id: 0,
             pos: 0,
@@ -249,8 +252,13 @@ impl<'a> StdLexer<'a> {
         }
     }
 
-    fn src(&self) -> &Source {
-        &self.session.sources()[self.file_id]
+    fn src(&self) -> Ref<'_, Source> {
+        let session = self.session.borrow();
+        Ref::map(session, |s| &s.sources()[self.file_id])
+    }
+
+    fn emit_error(&mut self, diag: Diagnostic) {
+        self.session.borrow_mut().emit_error(diag);
     }
 
     fn peek(&self, offset: u8) -> Option<char> {

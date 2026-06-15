@@ -17,6 +17,14 @@ macro_rules! span {
     };
 }
 #[macro_export]
+macro_rules! span_type {
+    ($id:expr, $ty:expr) => {{
+        let info = $ty.info();
+        $crate::span!($id, info.line, info.offset, info.len)
+    }};
+}
+
+#[macro_export]
 macro_rules! diag {
     ($level:expr, $span:expr, $phase:expr, $notes:expr, $helps:expr, $($msg:tt)*) => {
         $crate::report::Diagnostic::new(format!($($msg)*), $level, $span, $phase, $notes, $helps)
