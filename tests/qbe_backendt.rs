@@ -1,4 +1,5 @@
 use colored::*;
+use krez::backend::{Backend, BackendOutput, qbe::QbeBackend};
 use krez::lexer::{Lexer, std::StdLexer};
 use krez::parser::{Parser, std::StdParser};
 use krez::report::std::{StdReporter, Verbose};
@@ -14,19 +15,19 @@ fn test_qbe() {
         "test.kz",
         "
 fn main(argc: i32, args: &[string]) i32 {
-	mut a = 4 ;
-	fix b = true;
-	mut z: f32 = 3.14;
 }",
     );
     let mut lx = StdLexer::new(session.clone());
     let tokens = lx.tokenize(file_id);
     let mut pr = StdParser::new(session.clone());
     let ast = pr.parse(tokens, file_id);
-    println!("AST:");
-    for stmt in ast {
-        println!("{stmt}");
-    }
+    let mut backend = QbeBackend::new(session.clone());
+    let ir = backend.compile(file_id, &ast);
+    let ir = match ir {
+        BackendOutput::Text(text) => text,
+        _ => unreachable!("WTF?"),
+    };
+    println!("QBE IR:\n{}", ir);
     if session.borrow().has_error() {
         session.borrow().show_errors();
     }

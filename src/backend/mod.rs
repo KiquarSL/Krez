@@ -1,10 +1,25 @@
 use crate::parser::ast::Stmt;
-use crate::session::{Session, source::FileId};
+use crate::session::source::FileId;
+use std::fmt;
 pub mod qbe;
 
+#[derive(Debug, Clone)]
 pub enum BackendOutput {
     Text(String),
     Binary(Vec<u8>),
+}
+
+impl fmt::Display for BackendOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Text(txt) => txt.clone(),
+                Self::Binary(bytes) => format!("{:?}", bytes),
+            }
+        )
+    }
 }
 
 impl BackendOutput {
