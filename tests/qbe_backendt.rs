@@ -6,16 +6,18 @@ use krez::session::Session;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-fn test_parser_use() {
-    println!("{}", "test_parser_use".yellow());
+fn test_qbe() {
+    println!("{}", "test_qbe".yellow());
     let reporter = Box::new(StdReporter::new(Verbose::Dev));
     let session = Rc::new(RefCell::new(Session::new(Some(reporter))));
     let file_id = session.borrow_mut().source_map_mut().add(
         "test.kz",
         "
-use std::io;
-use crate::some::func;
-",
+fn main(argc: i32, args: &[string]) i32 {
+	mut a = 4 ;
+	fix b = true;
+	mut z: f32 = 3.14;
+}",
     );
     let mut lx = StdLexer::new(session.clone());
     let tokens = lx.tokenize(file_id);
@@ -30,9 +32,10 @@ use crate::some::func;
     }
     assert_eq!(session.borrow().has_error(), false);
 }
+
 #[test]
 fn main() {
     println!("===== Running tests =====");
-    test_parser_use();
+    test_qbe();
     println!("===== All tests passed! =====");
 }

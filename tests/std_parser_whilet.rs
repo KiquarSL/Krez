@@ -3,12 +3,14 @@ use krez::lexer::{Lexer, std::StdLexer};
 use krez::parser::{Parser, std::StdParser};
 use krez::report::std::{StdReporter, Verbose};
 use krez::session::Session;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 fn test_parser_while() {
     println!("{}", "test_parser_while".yellow());
-    let mut session = Session::new(Box::new(StdReporter::new(Verbose::Dev)));
-    let source_map = session.source_map_mut();
-    let file_id = source_map.add(
+    let reporter = Box::new(StdReporter::new(Verbose::Dev));
+    let session = Rc::new(RefCell::new(Session::new(Some(reporter))));
+    let file_id = session.borrow_mut().source_map_mut().add(
         "test.kz",
         "
 while true {
@@ -19,25 +21,25 @@ while true {
 	}
 }",
     );
-    let mut lx = StdLexer::new(&mut session);
+    let mut lx = StdLexer::new(session.clone());
     let tokens = lx.tokenize(file_id);
-    let mut pr = StdParser::new(&mut session);
+    let mut pr = StdParser::new(session.clone());
     let ast = pr.parse(tokens, file_id);
     println!("AST:");
     for stmt in ast {
         println!("{stmt}");
     }
-    if session.has_error() {
-        session.show_errors();
+    if session.borrow().has_error() {
+        session.borrow().show_errors();
     }
-    assert_eq!(session.has_error(), false);
+    assert_eq!(session.borrow().has_error(), false);
 }
 
 fn test_parser_while_err() {
     println!("{}", "test_parser_while_err".yellow());
-    let mut session = Session::new(Box::new(StdReporter::new(Verbose::Dev)));
-    let source_map = session.source_map_mut();
-    let file_id = source_map.add(
+    let reporter = Box::new(StdReporter::new(Verbose::Dev));
+    let session = Rc::new(RefCell::new(Session::new(Some(reporter))));
+    let file_id = session.borrow_mut().source_map_mut().add(
         "test.kz",
         "
 while {
@@ -46,18 +48,18 @@ while {
 
 while 1<3",
     );
-    let mut lx = StdLexer::new(&mut session);
+    let mut lx = StdLexer::new(session.clone());
     let tokens = lx.tokenize(file_id);
-    let mut pr = StdParser::new(&mut session);
+    let mut pr = StdParser::new(session.clone());
     let ast = pr.parse(tokens, file_id);
     println!("AST:");
     for stmt in ast {
         println!("{stmt}");
     }
-    if session.has_error() {
-        session.show_errors();
+    if session.borrow().has_error() {
+        session.borrow().show_errors();
     }
-    assert_eq!(session.has_error(), true);
+    assert_eq!(session.borrow().has_error(), true);
 }
 
 #[test]
