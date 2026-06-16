@@ -7,7 +7,6 @@ use std::fmt;
 pub enum Type {
     #[default]
     Unknown,
-    Void(Info),
     I32(Info),
     F32(Info),
     Bool(Info),
@@ -21,7 +20,6 @@ impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Type::Unknown => write!(f, "UNKNOWN"),
-            Type::Void(_) => write!(f, "void"),
             Type::I32(_) => write!(f, "i32"),
             Type::F32(_) => write!(f, "f32"),
             Type::Bool(_) => write!(f, "bool"),
@@ -47,7 +45,6 @@ impl Type {
     pub fn info(&self) -> Info {
         match self {
             Type::Str(info)
-            | Type::Void(info)
             | Type::I32(info)
             | Type::F32(info)
             | Type::Bool(info)

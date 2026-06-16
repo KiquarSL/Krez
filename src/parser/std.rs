@@ -973,9 +973,9 @@ impl StdParser {
             }
             ags
         };
-        let mut ret_ty = Type::Unknown;
+        let mut ret_ty = None;
         if self.peek(0).kind != TKind::LBrace {
-            ret_ty = self.parse_type();
+            ret_ty = Some(self.parse_type());
         }
         if !self.check(TKind::LBrace) {
             let lbrace = self.peek(0);

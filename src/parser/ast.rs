@@ -32,7 +32,7 @@ pub enum Stmt {
     4. Return type
     5. Body
     */
-    Func(bool, String, Vec<(String, Type)>, Type, Vec<Stmt>),
+    Func(bool, String, Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
     /** Keep vector of condition and body
     If condition is None, its else block
     */
@@ -72,7 +72,15 @@ impl fmt::Display for Stmt {
             }
             Stmt::Func(is_pub, id, args, ret, body) => {
                 let pub_str = if *is_pub { "pub " } else { "" };
-                let head = format!("{pub_str}fn {id}({}) {ret} {{", display_args(args.to_vec()),);
+                let head = format!(
+                    "{pub_str}fn {id}({}) {}{{",
+                    display_args(args.to_vec()),
+                    if let Some(ty) = ret {
+                        ty.to_string()
+                    } else {
+                        "".to_string()
+                    }
+                );
                 let body = body
                     .iter()
                     .map(|stmt| format!("    {stmt}"))
