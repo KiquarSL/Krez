@@ -11,7 +11,7 @@ enum BackendType {
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, num_args = 1..)]
+    #[arg(short, long, required = true, num_args = 1..)]
     pub src: Vec<String>,
     #[arg(short, long, default_value = "qbe")]
     pub backend: BackendType,

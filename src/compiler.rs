@@ -119,7 +119,9 @@ impl KrezCompiler {
             let source = &sources[*file_id];
             let source_path = Path::new(&source.name);
             let rel = source_path.strip_prefix(&root).unwrap_or(source_path);
-            let out_path = Path::new(&self.build_dir).join(rel).with_extension("ssa");
+            let out_path = Path::new(&(self.build_dir.clone() + &self.backend.out_dir()))
+                .join(rel)
+                .with_extension("ssa");
             if let Some(parent) = out_path.parent() {
                 std::fs::create_dir_all(parent)?;
             }

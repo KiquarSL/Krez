@@ -34,4 +34,5 @@ impl BackendOutput {
 pub trait Backend {
     fn compile(&mut self, file_id: FileId, ast: &[Stmt]) -> BackendOutput;
     fn ext(&self) -> String;
+    fn out_dir(&self) -> String;
 }

@@ -77,6 +77,10 @@ impl Backend for QbeBackend {
     fn ext(&self) -> String {
         String::from(".ssa")
     }
+
+    fn out_dir(&self) -> String {
+        String::from("/qbe")
+    }
 }
 
 impl QbeBackend {
