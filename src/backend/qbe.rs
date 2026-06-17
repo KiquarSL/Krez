@@ -1,5 +1,6 @@
 use crate::backend::{Backend, BackendOutput};
 use crate::parser::{
+    Info,
     ast::{AssignOp, MutKind, Stmt},
     expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp},
     types,
@@ -229,10 +230,22 @@ impl QbeBackend {
                 (value, ty)
             }
             Expr::Unary(op, expr, _info) => {
-                let (_left_tmp, value, ty) = self.gen_expr(*expr, block, ty.clone());
+                let (_left_tmp, value, ty) = self.gen_expr(*expr.clone(), block, ty.clone());
                 let instr = match op {
                     UnaryOp::Neg => Instr::Neg(value),
-                    UnaryOp::Not => todo!("Not unary operator"),
+                    UnaryOp::Not => {
+                        let (not_tmp, _not_value, _not_ty) = self.gen_expr(
+                            Expr::Comp(
+                                expr.clone(),
+                                CompOp::Ne,
+                                Box::new(Expr::Int(0, Info::empty())),
+                                Info::empty(),
+                            ),
+                            block,
+                            ty.clone(),
+                        );
+                        Instr::Copy(Value::Temporary(not_tmp))
+                    }
                 };
                 let value = Value::Temporary(tmp.clone());
                 block.assign_instr(value.clone(), ty.clone(), instr);

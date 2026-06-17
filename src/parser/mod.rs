@@ -23,6 +23,16 @@ pub struct Info {
     pub len: usize,
 }
 
+impl Info {
+    pub fn empty() -> Info {
+        Info {
+            len: 0,
+            line: 0,
+            offset: 0,
+        }
+    }
+}
+
 use core::fmt;
 
 impl fmt::Display for Info {
