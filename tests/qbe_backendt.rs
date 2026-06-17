@@ -15,6 +15,11 @@ fn test_qbe() {
         "test.kz",
         "
 fn main(argc: i32, args: &[string]) i32 {
+	fix a: i32 = 2 + 2 * 2;
+	mut z: bool = true;
+	fix j: f32 = 3.14 + 3.0; 
+	
+	
 }",
     );
     let mut lx = StdLexer::new(session.clone());

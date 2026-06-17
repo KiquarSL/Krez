@@ -1,7 +1,7 @@
 use crate::backend::{Backend, BackendOutput};
 use crate::parser::{
     ast::{AssignOp, Stmt},
-    expr::Expr,
+    expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp},
     types,
 };
 use crate::report::{Diagnostic, Level, Phase};
@@ -80,9 +80,11 @@ impl QbeBackend {
                 };
                 let mut func = Function::new(linkable, id, self.to_qbe_args(args.to_vec()), ret_ty);
                 let block = func.add_block("start");
+                self.push_scope();
                 for stmt in body {
                     self.gen_body_stmt(&stmt, block);
                 }
+                self.pop_scope();
                 self.module.add_function(func);
             }
             _ => todo!(),
@@ -91,7 +93,7 @@ impl QbeBackend {
 
     fn gen_body_stmt(&mut self, stmt: &Stmt, block: &mut Block) {
         match stmt {
-            Stmt::Declare(mut_kind, id, ty, val) => {
+            Stmt::Declare(_mut_kind, id, ty, val) => {
                 let instr_alloc = match ty.size(self) {
                     (4, n) => Instr::Alloc4(n as u32),
                     (8, n) => Instr::Alloc8(n as u64),
@@ -99,26 +101,58 @@ impl QbeBackend {
                     _ => unreachable!(),
                 };
                 let ty = ty.to_qbe(self);
-                block.assign_instr(Value::Temporary(id.clone()), ty, instr_alloc);
+                block.assign_instr(Value::Temporary(id.clone()), ty.clone(), instr_alloc);
                 self.push_var(id.clone(), ty);
                 self.gen_body_stmt(
-                    &Stmt::Assign(false, id.clone(), AssignOp::default(), val),
+                    &Stmt::Assign(false, id.clone(), AssignOp::default(), val.clone()),
                     block,
                 );
             }
-            Stmt::Assign(is_deref, id, assign_op, val) => {
-                block.assign_instr(
-                    Value::Temporary(id.clone()),
-                    self.var_type(id.clone()),
-                    self.gen_expr(val.clone()),
-                );
+            Stmt::Assign(_is_deref, id, _assign_op, val) => {
+                let ty = self.var_type(id.clone());
+                let value = self.gen_expr(val.clone(), block, ty.clone());
+                block.assign_instr(Value::Temporary(id.clone()), ty, Instr::Copy(value.1));
             }
             _ => todo!(),
         }
     }
 
-    fn gen_expr(&self, expr: Expr) -> Instr {
-        todo!()
+    fn gen_expr(&mut self, expr: Expr, block: &mut Block, ty: Type) -> (String, Value, Type) {
+        let tmp = self.new_tmp();
+        let value = match expr {
+            Expr::Int(n, _info) => {
+                let value = Value::Const(n as u64);
+                (value, Type::Word)
+            }
+            Expr::Float(n, _info) => {
+                let value = Value::Const(n.to_bits());
+                (value, Type::Single)
+            }
+            Expr::Id(id, _info) => {
+                let value = Value::Temporary(id.last().unwrap().clone());
+                (value, Type::Long)
+            }
+            Expr::Bool(truth, _info) => {
+                let truth = if truth { 1 } else { 0 };
+                let value = Value::Const(truth);
+                (value, Type::Word)
+            }
+            Expr::Arith(left, op, right, _info) => {
+                let (_left_tmp, left_value, _) = self.gen_expr(*left, block, ty.clone());
+                let (_right_tmp, right_value, _) = self.gen_expr(*right, block, ty.clone());
+                let instr = match op {
+                    ArithOp::Add => Instr::Add(left_value, right_value),
+                    ArithOp::Div => Instr::Div(left_value, right_value),
+                    ArithOp::Mul => Instr::Mul(left_value, right_value),
+                    ArithOp::Sub => Instr::Sub(left_value, right_value),
+                };
+                let value = Value::Temporary(tmp.clone());
+                block.assign_instr(value.clone(), ty.clone(), instr);
+                (value, ty)
+            }
+            _ => todo!(),
+        };
+        (tmp, value.0, value.1)
     }
 
     fn emit_error(&mut self, diag: Diagnostic) {
@@ -131,18 +165,18 @@ impl QbeBackend {
         label
     }
 
+    fn new_tmp(&mut self) -> String {
+        let tmp = format!("_tmp_{}", self.tmp_count);
+        self.tmp_count += 1;
+        tmp
+    }
+
     fn push_scope(&mut self) {
         self.scopes.push(HashMap::new());
     }
 
     fn pop_scope(&mut self) {
         self.scopes.pop();
-    }
-
-    fn new_tmp(&mut self) -> String {
-        let tmp = format!("tmp_{}", self.tmp_count);
-        self.tmp_count += 1;
-        tmp
     }
 
     fn var_type(&self, id: String) -> Type {
