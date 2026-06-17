@@ -10,7 +10,7 @@ use crate::session::{
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 pub struct KrezCompiler {
@@ -80,44 +80,71 @@ impl KrezCompiler {
                     pub_uses: vec![],
                 },
             );
-            if self.session.borrow().has_error() {
-                self.session.borrow().show_errors();
+            let session = self.session.borrow();
+            if session.has_error() {
+                session.show_errors();
                 return Ok(());
             }
             let ast = self.parser.parse(tokens, file_id);
             self.ast.insert(file_id, ast);
-            if self.session.borrow().has_error() {
-                self.session.borrow().show_errors();
+            let session = self.session.borrow();
+            if session.has_error() {
+                session.show_errors();
                 return Ok(());
             }
         }
-
         let mut api = KrezCompilerApi {
-            session: &mut self.session.borrow_mut(),
+            session: self.session.clone(),
             ast: &mut self.ast,
             modules: &mut self.modules,
         };
         for plugin in &mut self.plugins {
             plugin.run(&mut api);
         }
-        if self.session.borrow().has_error() {
-            self.session.borrow().show_errors();
+        let session = self.session.borrow();
+        if session.has_error() {
+            session.show_errors();
             return Ok(());
         }
-        let sess = &self.session.borrow();
-        let sources = sess.sources();
+        let root = self.find_root_path();
+
+        let session = self.session.borrow();
+        let sources = session.sources();
         for (file_id, ast) in &self.ast {
             let output = self.backend.compile(*file_id, ast);
-            if self.session.borrow().has_error() {
-                self.session.borrow().show_errors();
+            if session.has_error() {
+                session.show_errors();
                 return Ok(());
             }
             let source = &sources[*file_id];
-            let name = source.name.clone() + &self.backend.ext();
-            let path = &(self.build_dir.clone() + &name);
-            output.write(Path::new(path))?;
+            let source_path = Path::new(&source.name);
+            let rel = source_path.strip_prefix(&root).unwrap_or(source_path);
+            let out_path = Path::new(&self.build_dir).join(rel).with_extension("ssa");
+            if let Some(parent) = out_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+
+            output.write(&out_path)?;
         }
         Ok(())
+    }
+
+    fn find_root_path(&self) -> PathBuf {
+        let session = self.session.borrow();
+        let sources = session.sources();
+        let mut root = PathBuf::from(&sources[0].name);
+
+        for source in sources {
+            let path = Path::new(&source.name);
+            while !path.starts_with(&root) {
+                root = root.parent().unwrap_or(&root).to_path_buf();
+            }
+        }
+        if root.is_file() {
+            root = root.parent().unwrap_or(&root).to_path_buf();
+        }
+
+        root
     }
 }
 
@@ -153,6 +180,6 @@ impl FuncInfo {
 
 pub struct KrezCompilerApi<'a> {
     pub ast: &'a mut HashMap<FileId, Vec<Stmt>>,
-    pub session: &'a mut Session,
+    pub session: Rc<RefCell<Session>>,
     pub modules: &'a mut HashMap<FileId, Module>,
 }

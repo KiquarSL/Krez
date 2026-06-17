@@ -252,15 +252,15 @@ impl QbeBackend {
                 (value, ty)
             }
             Expr::Call(id, args, _info) => {
-                let id = match *id {
-                    Expr::Id(path, _) => path.last().expect("Path need have last"),
+                let func_id = match *id {
+                    Expr::Id(path, _) => path.last().expect("Path need have last").clone(),
                     _ => unreachable!(),
                 };
-                let args = self.to_qbe_args(block, id.clone(), args);
-                block.add_instr(Instr::Call(id.clone(), args, None));
+                let args = self.to_qbe_args(block, func_id.clone(), args);
+                block.add_instr(Instr::Call(func_id.clone(), args, None));
                 (
                     Value::Temporary(tmp.clone()),
-                    self.functions.get(id).unwrap().0.clone().unwrap(),
+                    self.functions.get(&func_id).unwrap().0.clone().unwrap(),
                 )
             }
             Expr::Invalid => {

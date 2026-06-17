@@ -80,7 +80,8 @@ impl StdReporter {
     }
 }
 
-#[derive(PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone, clap::ValueEnum)]
+#[clap(rename_all = "lowercase")]
 pub enum Verbose {
     Normal,
     Verbose,

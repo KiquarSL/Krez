@@ -60,3 +60,27 @@ Use `-- --nocapture` for see output
 ```sh
 cargo test -- --nocapture
 ```
+
+### Usage
+
+Inside project for example usage:
+
+See help:
+```bash
+cargo run -- --help
+```
+
+1. Full command version
+```bash
+cargo run -- --src tests/data/main.kz tests/data/some/some.kz --backend qbe --target tests/data/ktarget --verbose verbose
+```
+2. Full short command version
+```bash
+cargo run -- -s tests/data/main.kz tests/data/some/some.kz -b qbe -t tests/data/ktarget -v verbose
+```
+3. Minimum
+```bash
+cargo run -- -s tests/data/main.kz tests/data/some/some.kz -t tests/data/ktarget
+```
+
+See result in [ktarget](tests/data/ktarget)

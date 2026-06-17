@@ -1,4 +1,4 @@
-pub mod std;
+// pub mod std;
 
 use crate::compiler::KrezCompilerApi;
 use crate::parser::{
