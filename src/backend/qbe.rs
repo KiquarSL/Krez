@@ -1,23 +1,36 @@
 use crate::backend::{Backend, BackendOutput};
 use crate::parser::{
-    ast::{AssignOp, Stmt},
+    ast::{AssignOp, MutKind, Stmt},
     expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp},
     types,
 };
 use crate::report::{Diagnostic, Level, Phase};
 use crate::session::{Session, source::FileId};
-use crate::{diag, span_type};
-use qbe::{Block, Function, Instr, Linkage, Module, Type, Value};
+use crate::{diag, span, span_type};
+use qbe::{Block, Cmp, Function, Instr, Linkage, Module, Type, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+
+macro_rules! emit_error_type {
+    ($self:expr, $expr:expr,$notes:expr, $helps:expr, $($msg:tt)*) => {
+        $self.emit_error(diag!(
+            Level::Error,
+            span_type!($self.file_id, $expr),
+            Phase::CodeGen,
+            $notes,
+            $helps,
+            $($msg)*
+         ));
+    };
+}
 
 macro_rules! emit_error {
     ($self:expr, $expr:expr,$notes:expr, $helps:expr, $($msg:tt)*) => {
         $self.emit_error(diag!(
             Level::Error,
-            span_type!($self.file_id, $expr),
-            Phase::Parsing,
+            span!($self.file_id, $expr.line, $expr.offset, $expr.len),
+            Phase::CodeGen,
             $notes,
             $helps,
             $($msg)*
@@ -33,7 +46,7 @@ pub struct QbeBackend {
     label_count: usize,
     tmp_count: usize,
 
-    scopes: Vec<HashMap<String, Type>>,
+    scopes: Vec<HashMap<String, (bool, Type)>>,
 }
 
 impl QbeBackend {
@@ -93,7 +106,7 @@ impl QbeBackend {
 
     fn gen_body_stmt(&mut self, stmt: &Stmt, block: &mut Block) {
         match stmt {
-            Stmt::Declare(_mut_kind, id, ty, val) => {
+            Stmt::Declare(mut_kind, id, ty, val) => {
                 let instr_alloc = match ty.size(self) {
                     (4, n) => Instr::Alloc4(n as u32),
                     (8, n) => Instr::Alloc8(n as u64),
@@ -102,14 +115,14 @@ impl QbeBackend {
                 };
                 let ty = ty.to_qbe(self);
                 block.assign_instr(Value::Temporary(id.clone()), ty.clone(), instr_alloc);
-                self.push_var(id.clone(), ty);
+                self.push_var(id.clone(), ty, *mut_kind == MutKind::Mutable);
                 self.gen_body_stmt(
                     &Stmt::Assign(false, id.clone(), AssignOp::default(), val.clone()),
                     block,
                 );
             }
             Stmt::Assign(_is_deref, id, _assign_op, val) => {
-                let ty = self.var_type(id.clone());
+                let (_is_mut, ty) = self.var_info(id.clone());
                 let value = self.gen_expr(val.clone(), block, ty.clone());
                 block.assign_instr(Value::Temporary(id.clone()), ty, Instr::Copy(value.1));
             }
@@ -119,7 +132,7 @@ impl QbeBackend {
 
     fn gen_expr(&mut self, expr: Expr, block: &mut Block, ty: Type) -> (String, Value, Type) {
         let tmp = self.new_tmp();
-        let value = match expr {
+        let value = match expr.clone() {
             Expr::Int(n, _info) => {
                 let value = Value::Const(n as u64);
                 (value, Type::Word)
@@ -129,8 +142,13 @@ impl QbeBackend {
                 (value, Type::Single)
             }
             Expr::Id(id, _info) => {
-                let value = Value::Temporary(id.last().unwrap().clone());
-                (value, Type::Long)
+                let id = id.last().unwrap().clone();
+                let value = Value::Temporary(id.clone());
+                if !self.has_var(id.clone()) {
+                    let info = expr.info();
+                    emit_error!(self, info, vec![], vec![], "Undefined variable",);
+                }
+                (value, self.var_info(id).1)
             }
             Expr::Bool(truth, _info) => {
                 let truth = if truth { 1 } else { 0 };
@@ -138,13 +156,83 @@ impl QbeBackend {
                 (value, Type::Word)
             }
             Expr::Arith(left, op, right, _info) => {
-                let (_left_tmp, left_value, _) = self.gen_expr(*left, block, ty.clone());
-                let (_right_tmp, right_value, _) = self.gen_expr(*right, block, ty.clone());
+                let (_left_tmp, left_value, left_ty) = self.gen_expr(*left, block, ty.clone());
+                let (_right_tmp, right_value, right_ty) = self.gen_expr(*right, block, ty.clone());
+                if left_ty != right_ty {
+                    // TODO: move it to type checker plugin
+                    let info = expr.info();
+                    emit_error!(
+                        self,
+                        info,
+                        vec![],
+                        vec![],
+                        "Cannot use operator with other types: {left_ty} {op} {right_ty}",
+                    );
+                }
                 let instr = match op {
                     ArithOp::Add => Instr::Add(left_value, right_value),
                     ArithOp::Div => Instr::Div(left_value, right_value),
                     ArithOp::Mul => Instr::Mul(left_value, right_value),
                     ArithOp::Sub => Instr::Sub(left_value, right_value),
+                };
+                let value = Value::Temporary(tmp.clone());
+                block.assign_instr(value.clone(), ty.clone(), instr);
+                (value, ty)
+            }
+
+            Expr::Comp(left, op, right, _info) => {
+                let (_left_tmp, left_value, left_ty) = self.gen_expr(*left, block, ty.clone());
+                let (_right_tmp, right_value, right_ty) = self.gen_expr(*right, block, ty.clone());
+                if left_ty != right_ty {
+                    // TODO: move it to type checker plugin
+                    let info = expr.info();
+                    emit_error!(
+                        self,
+                        info,
+                        vec![],
+                        vec![],
+                        "Cannot compare with other types: {left_ty} {op} {right_ty}",
+                    );
+                }
+                let cmp = match op {
+                    CompOp::Eq => Cmp::Eq,
+                    CompOp::Ne => Cmp::Ne,
+                    _ => todo!("Compre op: < > <= >="),
+                };
+
+                let value = Value::Temporary(tmp.clone());
+                let instr = Instr::Cmp(ty.clone(), cmp, left_value, right_value);
+                block.assign_instr(value.clone(), ty.clone(), instr);
+                (value, ty)
+            }
+            Expr::Logic(left, op, right, _info) => {
+                let (_left_tmp, left_value, left_ty) = self.gen_expr(*left, block, ty.clone());
+                let (_right_tmp, right_value, right_ty) = self.gen_expr(*right, block, ty.clone());
+                if left_ty != right_ty {
+                    // TODO: move it to type checker plugin
+                    let info = expr.info();
+                    emit_error!(
+                        self,
+                        info,
+                        vec![],
+                        vec![],
+                        "Cannot logic compare with other types: {left_ty} {op} {right_ty}",
+                    );
+                }
+                let instr = match op {
+                    LogicOp::And => Instr::And(left_value, right_value),
+                    LogicOp::Or => Instr::Or(left_value, right_value),
+                };
+
+                let value = Value::Temporary(tmp.clone());
+                block.assign_instr(value.clone(), ty.clone(), instr);
+                (value, ty)
+            }
+            Expr::Unary(op, expr, _info) => {
+                let (_left_tmp, value, ty) = self.gen_expr(*expr, block, ty.clone());
+                let instr = match op {
+                    UnaryOp::Neg => Instr::Neg(value),
+                    UnaryOp::Not => todo!("Not unary operator"),
                 };
                 let value = Value::Temporary(tmp.clone());
                 block.assign_instr(value.clone(), ty.clone(), instr);
@@ -179,15 +267,15 @@ impl QbeBackend {
         self.scopes.pop();
     }
 
-    fn var_type(&self, id: String) -> Type {
+    fn var_info(&self, id: String) -> (bool, Type) {
         for scope in &self.scopes {
-            for (var_id, ty) in scope {
+            for (var_id, info) in scope {
                 if *var_id == id {
-                    return ty.clone();
+                    return info.clone();
                 }
             }
         }
-        Type::Zero
+        (false, Type::Zero)
     }
 
     fn has_var(&self, id: String) -> bool {
@@ -201,17 +289,17 @@ impl QbeBackend {
         false
     }
 
-    fn push_var(&mut self, id: String, ty: Type) {
+    fn push_var(&mut self, id: String, ty: Type, is_mut: bool) {
         for scope in &mut self.scopes {
             for var_id in scope.keys() {
                 if *var_id == id {
-                    scope.insert(id, ty);
+                    scope.insert(id, (is_mut, ty));
                     return;
                 }
             }
         }
         if let Some(last) = self.scopes.last_mut() {
-            last.insert(id, ty);
+            last.insert(id, (is_mut, ty));
         }
     }
 
@@ -229,13 +317,11 @@ impl QbeBackend {
 impl types::Type {
     pub fn size(&self, backend: &mut QbeBackend) -> (u8, u128) {
         match self {
-            Self::I32(_) => (4, 1),
-            Self::F32(_) => (4, 1),
-            Self::Bool(_) => (4, 1),
+            Self::I32(_) | Self::U32(_) | Self::F32(_) | Self::Bool(_) => (4, 1),
             Self::Ptr(..) | Self::Str(_) | Self::Array(..) | Self::Custom(..) => (8, 1),
 
             Self::Unknown => {
-                emit_error!(
+                emit_error_type!(
                     backend,
                     self,
                     vec!["Use correct type"],
@@ -250,13 +336,11 @@ impl types::Type {
     /// Convert Krez to QBE type
     pub fn to_qbe(&self, backend: &mut QbeBackend) -> Type {
         match self {
-            Self::I32(_) => Type::Word,
-            Self::F32(_) => Type::Single,
-            Self::Bool(_) => Type::Byte,
+            Self::I32(_) | Self::U32(_) | Self::Bool(_) => Type::Word,
             Self::Ptr(..) | Self::Str(_) | Self::Array(..) | Self::Custom(..) => Type::Long,
-
+            Self::F32(_) => Type::Single,
             Self::Unknown => {
-                emit_error!(
+                emit_error_type!(
                     backend,
                     self,
                     vec!["Use correct type"],

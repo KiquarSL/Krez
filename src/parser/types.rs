@@ -9,6 +9,7 @@ pub enum Type {
     Unknown,
     I32(Info),
     F32(Info),
+	U32(Info),
     Bool(Info),
     Str(Info),
     Custom(String, Info),
@@ -22,6 +23,7 @@ impl fmt::Display for Type {
             Type::Unknown => write!(f, "UNKNOWN"),
             Type::I32(_) => write!(f, "i32"),
             Type::F32(_) => write!(f, "f32"),
+			Type::U32(_) => write!(f, "u32"),
             Type::Bool(_) => write!(f, "bool"),
             Type::Str(_) => write!(f, "string"),
             Type::Custom(name, _) => write!(f, "{name}"),
@@ -47,6 +49,7 @@ impl Type {
             Type::Str(info)
             | Type::I32(info)
             | Type::F32(info)
+			| Type::U32(info)
             | Type::Bool(info)
             | Type::Array(_, info)
             | Type::Custom(_, info)
@@ -58,6 +61,20 @@ impl Type {
             },
         }
     }
+
+    pub fn is_float(&self) -> bool {
+        match self {
+            Self::F32(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_unsigned(&self) -> bool {
+        match self {
+            Self::U32(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl Type {
@@ -65,6 +82,7 @@ impl Type {
         match s {
             "i32" => Type::I32(info),
             "f32" => Type::F32(info),
+            "u32" => Type::U32(info),
             "bool" => Type::Bool(info),
             "string" => Type::Str(info),
             custom => Type::Custom(custom.to_string(), info),

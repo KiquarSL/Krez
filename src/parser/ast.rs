@@ -146,7 +146,7 @@ impl fmt::Display for Stmt {
 }
 
 /// Variable muttable type
-#[derive(Debug, strum::Display)]
+#[derive(Debug, PartialEq, strum::Display)]
 pub enum MutKind {
     /// Keyword: mut
     #[strum(to_string = "mut")]
