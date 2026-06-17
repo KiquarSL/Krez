@@ -1,5 +1,5 @@
 use super::expr::Expr;
-use super::types::{Type, display_args};
+use super::types::{display_args, Type};
 use std::fmt;
 use strum;
 

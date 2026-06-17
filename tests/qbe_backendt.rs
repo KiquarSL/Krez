@@ -16,7 +16,7 @@ fn test_qbe() {
         "
 fn main(argc: i32, args: &[string]) i32 {
 	fix a: i32 = 2 + 2 * 2;
-	mut z: bool = true;
+	mut z: bool = !true;
 	fix j: f32 = 3.14 + 3.0; 
 	
 	
@@ -48,7 +48,7 @@ fn test_qbe_err() {
         "
 fn main(argc: i32, args: &[string]) i32 {
 	fix a: i32 = 3.15 + 2;
-	mut z: bool = true;
+	fix z: bool = true;
 	fix j: f32 = 3.14 + z + r; 
 }",
     );

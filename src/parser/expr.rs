@@ -7,16 +7,27 @@ pub type BExpr = Box<Expr>;
 /// Keep value and informarion of position
 #[derive(Debug, Clone)]
 pub enum Expr {
+    /// Invalid expression
     Invalid,
+    /// Identificator as path: a::b::c
     Id(Vec<String>, Info),
+    /// Integer number: 10, 236...
     Int(i64, Info),
+    /// Float number: 3.14, 5.324...
     Float(f64, Info),
+    /// Boolean value: true, false
     Bool(bool, Info),
+    /// String literal value: "Hello"
     Str(String, Info),
+    /// Arithmetic: left operand (+-*/) right operand: 3 + 3
     Arith(BExpr, ArithOp, BExpr, Info),
+    /// Compare: left operand (< > >= <=) right operand: 3 >= 10
     Comp(BExpr, CompOp, BExpr, Info),
+    /// Logic: left operand (&& ||) right operand: 4 > 4 && true
     Logic(BExpr, LogicOp, BExpr, Info),
+    /// Unary: Not or negative: !true, -863
     Unary(UnaryOp, BExpr, Info),
+    /// Call: expr as id and vector as arguments: a::b::func(3, 8)
     Call(BExpr, Vec<Expr>, Info),
 }
 
