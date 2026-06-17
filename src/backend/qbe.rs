@@ -3,12 +3,12 @@ use crate::parser::{
     Info,
     ast::{AssignOp, MutKind, Stmt},
     expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp},
-    types,
+    types::Type,
 };
 use crate::report::{Diagnostic, Level, Phase};
 use crate::session::{Session, source::FileId};
 use crate::{diag, span, span_type};
-use qbe::{Block, Cmp, Function, Instr, Linkage, Module, Type, Value};
+use qbe::{Block, Cmp, Function, Instr, Linkage, Module, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -47,7 +47,7 @@ pub struct QbeBackend {
     label_count: usize,
     tmp_count: usize,
 
-    scopes: Vec<HashMap<String, (bool, Type)>>,
+    scopes: Vec<HashMap<String, Type>>,
 }
 
 impl QbeBackend {
@@ -107,25 +107,28 @@ impl QbeBackend {
 
     fn gen_body_stmt(&mut self, stmt: &Stmt, block: &mut Block) {
         match stmt {
-            Stmt::Declare(mut_kind, id, ty, val) => {
+            Stmt::Declare(_mut_kind, id, ty, val) => {
                 let instr_alloc = match ty.size(self) {
                     (4, n) => Instr::Alloc4(n as u32),
                     (8, n) => Instr::Alloc8(n as u64),
                     (16, n) => Instr::Alloc16(n),
                     _ => unreachable!(),
                 };
-                let ty = ty.to_qbe(self);
-                block.assign_instr(Value::Temporary(id.clone()), ty.clone(), instr_alloc);
-                self.push_var(id.clone(), ty, *mut_kind == MutKind::Mutable);
+                block.assign_instr(Value::Temporary(id.clone()), ty.to_qbe(self), instr_alloc);
+                self.push_var(id.clone(), ty.clone());
                 self.gen_body_stmt(
                     &Stmt::Assign(false, id.clone(), AssignOp::default(), val.clone()),
                     block,
                 );
             }
             Stmt::Assign(_is_deref, id, _assign_op, val) => {
-                let (_is_mut, ty) = self.var_info(id.clone());
+                let ty = self.var_info(id.clone());
                 let value = self.gen_expr(val.clone(), block, ty.clone());
-                block.assign_instr(Value::Temporary(id.clone()), ty, Instr::Copy(value.1));
+                block.assign_instr(
+                    Value::Temporary(id.clone()),
+                    ty.to_qbe(self),
+                    Instr::Copy(value.1),
+                );
             }
             _ => todo!(),
         }
@@ -134,42 +137,27 @@ impl QbeBackend {
     fn gen_expr(&mut self, expr: Expr, block: &mut Block, ty: Type) -> (String, Value, Type) {
         let tmp = self.new_tmp();
         let value = match expr.clone() {
-            Expr::Int(n, _info) => {
+            Expr::Int(n, info) => {
                 let value = Value::Const(n as u64);
-                (value, Type::Word)
+                (value, Type::I32(info))
             }
-            Expr::Float(n, _info) => {
+            Expr::Float(n, info) => {
                 let value = Value::Const(n.to_bits());
-                (value, Type::Single)
+                (value, Type::F32(info))
             }
             Expr::Id(id, _info) => {
                 let id = id.last().unwrap().clone();
                 let value = Value::Temporary(id.clone());
-                if !self.has_var(id.clone()) {
-                    let info = expr.info();
-                    emit_error!(self, info, vec![], vec![], "Undefined variable",);
-                }
-                (value, self.var_info(id).1)
+                (value, self.var_info(id))
             }
-            Expr::Bool(truth, _info) => {
+            Expr::Bool(truth, info) => {
                 let truth = if truth { 1 } else { 0 };
                 let value = Value::Const(truth);
-                (value, Type::Word)
+                (value, Type::Bool(info))
             }
             Expr::Arith(left, op, right, _info) => {
-                let (_left_tmp, left_value, left_ty) = self.gen_expr(*left, block, ty.clone());
-                let (_right_tmp, right_value, right_ty) = self.gen_expr(*right, block, ty.clone());
-                if left_ty != right_ty {
-                    // TODO: move it to type checker plugin
-                    let info = expr.info();
-                    emit_error!(
-                        self,
-                        info,
-                        vec![],
-                        vec![],
-                        "Cannot use operator with other types: {left_ty} {op} {right_ty}",
-                    );
-                }
+                let (_left_tmp, left_value, _left_ty) = self.gen_expr(*left, block, ty.clone());
+                let (_right_tmp, right_value, _right_ty) = self.gen_expr(*right, block, ty.clone());
                 let instr = match op {
                     ArithOp::Add => Instr::Add(left_value, right_value),
                     ArithOp::Div => Instr::Div(left_value, right_value),
@@ -177,56 +165,7 @@ impl QbeBackend {
                     ArithOp::Sub => Instr::Sub(left_value, right_value),
                 };
                 let value = Value::Temporary(tmp.clone());
-                block.assign_instr(value.clone(), ty.clone(), instr);
-                (value, ty)
-            }
-
-            Expr::Comp(left, op, right, _info) => {
-                let (_left_tmp, left_value, left_ty) = self.gen_expr(*left, block, ty.clone());
-                let (_right_tmp, right_value, right_ty) = self.gen_expr(*right, block, ty.clone());
-                if left_ty != right_ty {
-                    // TODO: move it to type checker plugin
-                    let info = expr.info();
-                    emit_error!(
-                        self,
-                        info,
-                        vec![],
-                        vec![],
-                        "Cannot compare with other types: {left_ty} {op} {right_ty}",
-                    );
-                }
-                let cmp = match op {
-                    CompOp::Eq => Cmp::Eq,
-                    CompOp::Ne => Cmp::Ne,
-                    _ => todo!("Compre op: < > <= >="),
-                };
-
-                let value = Value::Temporary(tmp.clone());
-                let instr = Instr::Cmp(ty.clone(), cmp, left_value, right_value);
-                block.assign_instr(value.clone(), ty.clone(), instr);
-                (value, ty)
-            }
-            Expr::Logic(left, op, right, _info) => {
-                let (_left_tmp, left_value, left_ty) = self.gen_expr(*left, block, ty.clone());
-                let (_right_tmp, right_value, right_ty) = self.gen_expr(*right, block, ty.clone());
-                if left_ty != right_ty {
-                    // TODO: move it to type checker plugin
-                    let info = expr.info();
-                    emit_error!(
-                        self,
-                        info,
-                        vec![],
-                        vec![],
-                        "Cannot logic compare with other types: {left_ty} {op} {right_ty}",
-                    );
-                }
-                let instr = match op {
-                    LogicOp::And => Instr::And(left_value, right_value),
-                    LogicOp::Or => Instr::Or(left_value, right_value),
-                };
-
-                let value = Value::Temporary(tmp.clone());
-                block.assign_instr(value.clone(), ty.clone(), instr);
+                block.assign_instr(value.clone(), ty.to_qbe(self), instr);
                 (value, ty)
             }
             Expr::Unary(op, expr, _info) => {
@@ -234,6 +173,7 @@ impl QbeBackend {
                 let instr = match op {
                     UnaryOp::Neg => Instr::Neg(value),
                     UnaryOp::Not => {
+                        todo!("For it need implement compare");
                         let (not_tmp, _not_value, _not_ty) = self.gen_expr(
                             Expr::Comp(
                                 expr.clone(),
@@ -248,10 +188,10 @@ impl QbeBackend {
                     }
                 };
                 let value = Value::Temporary(tmp.clone());
-                block.assign_instr(value.clone(), ty.clone(), instr);
+                block.assign_instr(value.clone(), ty.to_qbe(self), instr);
                 (value, ty)
             }
-            _ => todo!(),
+            _ => todo!("{expr}"),
         };
         (tmp, value.0, value.1)
     }
@@ -280,15 +220,15 @@ impl QbeBackend {
         self.scopes.pop();
     }
 
-    fn var_info(&self, id: String) -> (bool, Type) {
+    fn var_info(&self, id: String) -> Type {
         for scope in &self.scopes {
-            for (var_id, info) in scope {
+            for (var_id, ty) in scope {
                 if *var_id == id {
-                    return info.clone();
+                    return ty.clone();
                 }
             }
         }
-        (false, Type::Zero)
+        Type::Unknown
     }
 
     fn has_var(&self, id: String) -> bool {
@@ -302,21 +242,21 @@ impl QbeBackend {
         false
     }
 
-    fn push_var(&mut self, id: String, ty: Type, is_mut: bool) {
+    fn push_var(&mut self, id: String, ty: Type) {
         for scope in &mut self.scopes {
             for var_id in scope.keys() {
                 if *var_id == id {
-                    scope.insert(id, (is_mut, ty));
+                    scope.insert(id, ty);
                     return;
                 }
             }
         }
         if let Some(last) = self.scopes.last_mut() {
-            last.insert(id, (is_mut, ty));
+            last.insert(id, ty);
         }
     }
 
-    fn to_qbe_args(&mut self, args: Vec<(String, types::Type)>) -> Vec<(Type, Value)> {
+    fn to_qbe_args(&mut self, args: Vec<(String, Type)>) -> Vec<(qbe::Type, Value)> {
         let mut new_args = vec![];
         for (id, ty) in args {
             let val = Value::Temporary(id);
@@ -327,7 +267,7 @@ impl QbeBackend {
     }
 }
 
-impl types::Type {
+impl Type {
     pub fn size(&self, backend: &mut QbeBackend) -> (u8, u128) {
         match self {
             Self::I32(_) | Self::U32(_) | Self::F32(_) | Self::Bool(_) => (4, 1),
@@ -347,11 +287,11 @@ impl types::Type {
         }
     }
     /// Convert Krez to QBE type
-    pub fn to_qbe(&self, backend: &mut QbeBackend) -> Type {
+    pub fn to_qbe(&self, backend: &mut QbeBackend) -> qbe::Type {
         match self {
-            Self::I32(_) | Self::U32(_) | Self::Bool(_) => Type::Word,
-            Self::Ptr(..) | Self::Str(_) | Self::Array(..) | Self::Custom(..) => Type::Long,
-            Self::F32(_) => Type::Single,
+            Self::I32(_) | Self::U32(_) | Self::Bool(_) => qbe::Type::Word,
+            Self::Ptr(..) | Self::Str(_) | Self::Array(..) | Self::Custom(..) => qbe::Type::Long,
+            Self::F32(_) => qbe::Type::Single,
             Self::Unknown => {
                 emit_error_type!(
                     backend,
@@ -361,7 +301,7 @@ impl types::Type {
                     "Invalid type: {}",
                     self
                 );
-                Type::Zero
+                qbe::Type::Zero
             }
         }
     }
