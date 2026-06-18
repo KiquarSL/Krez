@@ -10,31 +10,31 @@ For standart backend using QBE.
 ```rust
 src
 ├── lib.rs
-├── compiler.rs		   	// KrezCompiler structure and api for it
+├── compiler.rs               // KrezCompiler structure and api for it
 ├── backend                
-│   ├── mod.rs				// Backend trait
-│   └── qbe.rs				// Qbe backend implementation
+│   ├── mod.rs                // Backend trait
+│   └── qbe.rs                // Qbe backend implementation
 ├── lexer
-│   ├── mod.rs				// Lexer trait
-│   ├── std.rs				// Standart implementation of Lexer
-│   └── token.rs		  	// Token and TokenKind
+│   ├── mod.rs                // Lexer trait
+│   ├── std.rs                // Standart implementation of Lexer
+│   └── token.rs              // Token and TokenKind
 ├── parser
-│   ├── mod.rs				// Parser trait
-│   ├── ast.rs				// Statement enum and dependensions enum's
-│   ├── expr.parser		   // Expression structure and dependensions
-│   ├── std.rs				// Standart implementation of Parser
-│   └── types.rs		  	// Type structure and functions for it
+│   ├── mod.rs                // Parser trait
+│   ├── ast.rs                // Statement enum and dependensions enum's
+│   ├── expr.parser           // Expression structure and dependensions
+│   ├── std.rs                // Standart implementation of Parser
+│   └── types.rs              // Type structure and functions for it
 ├── report
-│   ├── mod.rs				// Reporter trait
-│   └── std.rs		        // Standart implementation of Reporter
+│   ├── mod.rs                // Reporter trait
+│   └── std.rs                // Standart implementation of Reporter
 ├── session
-│   ├── mod.rs				// Session structure
-│   └── source.rs		 	// Source and SourceMap structures
-└── plugin 			       // Traits for visiting AST and standart implementation
-    ├── mod.rs				// Visitors and Plugin traits 
-    └── std			       // Standart implementations of Plugin
+│   ├── mod.rs                // Session structure
+│   └── source.rs             // Source and SourceMap structures
+└── plugin                    // Traits for visiting AST and standart implementation
+    ├── mod.rs                // Visitors and Plugin traits 
+    └── std                   // Standart implementations of Plugin
         ├── mod.rs           
-        └── collector.rs	  // Standart implementation of collector
+        └── collector.rs      // Standart implementation of collector
 ```
 
 ### Example
@@ -71,16 +71,16 @@ cargo run -- --help
 ```
 
 1. Full command version
-```bash
+```shell
 cargo run -- --src tests/data/main.kz tests/data/some/some.kz --backend qbe --target tests/data/ktarget --verbose verbose
 ```
 2. Full short command version
-```bash
+```shell
 cargo run -- -s tests/data/main.kz tests/data/some/some.kz -b qbe -t tests/data/ktarget -v verbose
 ```
 3. Minimum
-```bash
+```shell
 cargo run -- -s tests/data/main.kz tests/data/some/some.kz -t tests/data/ktarget
 ```
 
-See result in [ktarget](tests/data/ktarget)
+See result in tests/data/ktarget
