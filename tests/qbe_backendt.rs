@@ -14,12 +14,16 @@ fn test_qbe() {
     let file_id = session.borrow_mut().source_map_mut().add(
         "test.kz",
         "
+fn println(s: string) {
+	// it not implenented :/
+}
+				
 fn main(argc: i32, args: &[string]) i32 {
 	fix a: i32 = 2 + 2 * 2;
 	mut z: bool = !true;
 	fix j: f32 = 3.14 + 3.0; 
 	
-	
+	println(\"hi\");
 }",
     );
     let mut lx = StdLexer::new(session.clone());
@@ -46,10 +50,16 @@ fn test_qbe_err() {
     let file_id = session.borrow_mut().source_map_mut().add(
         "test.kz",
         "
+fn println(s: string) {
+	// it not implenented :/
+}		
+		
 fn main(argc: i32, args: &[string]) i32 {
 	fix a: i32 = 3.15 + 2;
 	fix z: bool = true;
 	fix j: f32 = 3.14 + z + r; 
+	
+	println(\"Err here -->\")
 }",
     );
     let mut lx = StdLexer::new(session.clone());

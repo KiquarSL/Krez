@@ -479,7 +479,7 @@ fn define(pr: &StdParser) -> StmtKind {
 impl StdParser {
     pub fn stmt(&mut self) -> Result<Stmt, ()> {
         Ok(match define(self) {
-            StmtKind::Expr => Stmt::Expr(self.expr()?),
+            StmtKind::Expr => self.stmt_expr(),
             StmtKind::Declare => self.stmt_declare(),
             StmtKind::Assign => self.stmt_assign(),
             StmtKind::Fn => self.stmt_fn(),
@@ -489,6 +489,28 @@ impl StdParser {
             StmtKind::While => self.stmt_while_loop(),
             StmtKind::Use => self.stmt_use(),
         })
+    }
+
+    fn stmt_expr(&mut self) -> Stmt {
+        let expr = Stmt::Expr(self.expr().unwrap_or(Expr::Invalid));
+        if !self.check(TKind::Semicolon) {
+            let semicolon = self.peek(0);
+            let new = self.back_peek(1);
+            emit_error!(
+                self,
+                semicolon,
+                vec![],
+                vec![help!(
+                    span!(self.file_id, new.line, new.offset + new.len, 0),
+                    ";",
+                    false,
+                    "Add ';' here"
+                )],
+                "Expected ';', found {}",
+                semicolon
+            );
+        }
+        expr
     }
 
     fn stmt_break_continue(&mut self) -> Stmt {

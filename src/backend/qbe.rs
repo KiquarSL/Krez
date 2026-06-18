@@ -68,6 +68,8 @@ impl QbeBackend {
 impl Backend for QbeBackend {
     fn compile(&mut self, file_id: FileId, ast: &[Stmt]) -> BackendOutput {
         self.file_id = file_id;
+        self.functions.clear();
+        self.scopes.clear();
         for stmt in ast {
             self.gen_stmt(stmt);
         }
@@ -115,7 +117,7 @@ impl QbeBackend {
                 self.pop_scope();
                 self.module.add_function(func);
             }
-            _ => todo!(),
+            _ => todo!("{stmt}"),
         }
     }
 
@@ -144,7 +146,10 @@ impl QbeBackend {
                     Instr::Copy(value.1),
                 );
             }
-            _ => todo!(),
+            Stmt::Expr(expr) => {
+                self.gen_expr(expr.clone(), block, Type::Unknown);
+            }
+            _ => todo!("{stmt}"),
         }
     }
 
@@ -168,6 +173,10 @@ impl QbeBackend {
                 let truth = if truth { 1 } else { 0 };
                 let value = Value::Const(truth);
                 (value, Type::Bool(info))
+            }
+            Expr::Str(s, info) => {
+                let value = Value::Global(s);
+                (value, Type::Str(info))
             }
             Expr::Arith(left, op, right, _info) => {
                 let (_left_tmp, left_value, left_ty) = self.gen_expr(*left, block, ty.clone());
@@ -264,7 +273,12 @@ impl QbeBackend {
                 block.add_instr(Instr::Call(func_id.clone(), args, None));
                 (
                     Value::Temporary(tmp.clone()),
-                    self.functions.get(&func_id).unwrap().0.clone().unwrap(),
+                    self.functions
+                        .get(&func_id)
+                        .unwrap()
+                        .0
+                        .clone()
+                        .unwrap_or(Type::Unknown),
                 )
             }
             Expr::Invalid => {
