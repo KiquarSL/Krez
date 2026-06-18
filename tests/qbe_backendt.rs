@@ -26,9 +26,12 @@ fn main(argc: i32, args: &[string]) i32 {
 	println(\"hi\");
 	
 	while 4 < 8 {
-		println(\"87\");
-		while a + 1 < 8 {
-			println(\"0\");
+		if a < 9 {
+			println(\"tuda\");
+		} elif a > 9 {
+			println(\"me tuda\");
+		} else {
+			println(\"o net\");
 		}
 	}
 }",

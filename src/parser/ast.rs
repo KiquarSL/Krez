@@ -1,5 +1,5 @@
 use super::expr::Expr;
-use super::types::{display_args, Type};
+use super::types::{Type, display_args};
 use std::fmt;
 use strum;
 
@@ -26,13 +26,21 @@ pub enum Stmt {
     */
     While(Expr, Vec<Stmt>),
     /** # Fields
-    1. Is public (Visibility in other modules)
-    2. Identifucator
-    3. Arguments (Identificator, Type)
-    4. Return type
-    5. Body
+    1. Is export (Visibility in linker)
+    2. Is public (Visibility in other modules)
+    3. Identifucator
+    4. Arguments (Identificator, Type)
+    5. Return type
+    6. Body
     */
-    Func(bool, String, Vec<(String, Type)>, Option<Type>, Vec<Stmt>),
+    Func(
+        bool,
+        bool,
+        String,
+        Vec<(String, Type)>,
+        Option<Type>,
+        Vec<Stmt>,
+    ),
     /** Keep vector of condition and body
     If condition is None, its else block
     */
@@ -70,10 +78,11 @@ impl fmt::Display for Stmt {
                     .join("\n");
                 format!("{head}\n{body}\n}}")
             }
-            Stmt::Func(is_pub, id, args, ret, body) => {
-                let pub_str = if *is_pub { "pub " } else { "" };
+            Stmt::Func(is_export, is_pub, id, args, ret, body) => {
+                let pub_str = if *is_export { "pub " } else { "" };
+                let exp_str = if *is_pub { "export " } else { "" };
                 let head = format!(
-                    "{pub_str}fn {id}({}) {}{{",
+                    "{exp_str}{pub_str}fn {id}({}) {}{{",
                     display_args(args.to_vec()),
                     if let Some(ty) = ret {
                         ty.to_string()

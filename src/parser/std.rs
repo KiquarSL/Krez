@@ -457,7 +457,10 @@ fn define(pr: &StdParser) -> StmtKind {
         (TKind::Keyword(Keyword::If), _) => StmtKind::IfElse,
         (TKind::Keyword(Keyword::Ret), _) => StmtKind::Return,
         (TKind::Keyword(Keyword::Fn), _)
-        | (TKind::Keyword(Keyword::Pub), TKind::Keyword(Keyword::Fn)) => StmtKind::Fn,
+        | (TKind::Keyword(Keyword::Pub), TKind::Keyword(Keyword::Fn))
+        | (TKind::Keyword(Keyword::Export), TKind::Keyword(Keyword::Pub | Keyword::Fn)) => {
+            StmtKind::Fn
+        }
         (TKind::Keyword(Keyword::While), _) => StmtKind::While,
         (
             TKind::Id(_),
@@ -928,6 +931,12 @@ impl StdParser {
     }
 
     fn stmt_fn(&mut self) -> Stmt {
+        let is_exp = if let TKind::Keyword(Keyword::Export) = self.peek(0).kind {
+            self.advance(1);
+            true
+        } else {
+            false
+        };
         let is_pub = if let TKind::Keyword(Keyword::Pub) = self.peek(0).kind {
             self.advance(1);
             true
@@ -1032,6 +1041,6 @@ impl StdParser {
                 rbrace
             );
         }
-        Stmt::Func(is_pub, id, args, ret_ty, body)
+        Stmt::Func(is_exp, is_pub, id, args, ret_ty, body)
     }
 }

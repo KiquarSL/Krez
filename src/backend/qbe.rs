@@ -88,11 +88,10 @@ impl Backend for QbeBackend {
 impl QbeBackend {
     fn gen_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Func(_is_pub, id, args, ret_ty, body) => {
-                let linkable = if id == "main" {
+            Stmt::Func(is_exp, _is_pub, id, args, ret_ty, body) => {
+                let linkable = if id == "main" || *is_exp {
                     Linkage::public()
                 } else {
-                    // temporary solution
                     Linkage::private()
                 };
                 self.functions.insert(
@@ -130,7 +129,7 @@ impl QbeBackend {
                     (16, n) => Instr::Alloc16(n),
                     _ => unreachable!(),
                 };
-                let block = func.blocks.last_mut().unwrap();
+                let block = get_block(func);
                 block.assign_instr(Value::Temporary(id.clone()), ty.to_qbe(self), instr_alloc);
                 self.push_var(id.clone(), ty.clone());
                 self.gen_body_stmt(
@@ -166,11 +165,45 @@ impl QbeBackend {
                 for body_stmt in body {
                     self.gen_body_stmt(func, body_stmt);
                 }
-                func.blocks
-                    .last_mut()
-                    .unwrap()
-                    .add_instr(Instr::Jmp(check_label.clone()));
+                get_block(func).add_instr(Instr::Jmp(check_label.clone()));
                 func.add_block(&exit_label);
+            }
+            Stmt::IfElse(branches) => {
+                let exit_label = self.new_label("if_exit");
+                for (i, (cond, body)) in branches.iter().enumerate() {
+                    let is_last = i == branches.len() - 1;
+                    let check_label = self.new_label("if_check");
+                    let start_label = self.new_label("if_start");
+
+                    let cond = if let Some(some_cond) = cond {
+                        some_cond
+                    } else {
+                        // handle else block (all elifs handle after let cond)
+                        func.add_block(start_label);
+                        for body_stmt in body {
+                            self.gen_body_stmt(func, body_stmt);
+                        }
+                        break;
+                    };
+                    // Build check block
+                    let check_block = func.add_block(check_label);
+                    let cond = self
+                        .gen_expr(cond.clone(), check_block, Type::Bool(cond.info()))
+                        .1;
+                    let exit = if !is_last {
+                        format!("check_{}", self.label_count)
+                    } else {
+                        exit_label.clone()
+                    };
+                    check_block.add_instr(Instr::Jnz(cond, start_label.clone(), exit));
+                    // Build start block
+                    func.add_block(start_label);
+                    for body_stmt in body {
+                        self.gen_body_stmt(func, body_stmt);
+                    }
+                    get_block(func).add_instr(Instr::Jmp(exit_label.clone()));
+                }
+                func.add_block(exit_label);
             }
             _ => todo!("{stmt}"),
         }
@@ -188,7 +221,7 @@ impl QbeBackend {
                 (value, Type::F32(info))
             }
             Expr::Id(id, _info) => {
-                let id = id.last().unwrap().clone();
+                let id = id.join("_");
                 let value = Value::Temporary(id.clone());
                 (value, self.var_info(id))
             }
@@ -289,7 +322,7 @@ impl QbeBackend {
             }
             Expr::Call(id, args, _info) => {
                 let func_id = match *id {
-                    Expr::Id(path, _) => path.last().expect("Path need have last").clone(),
+                    Expr::Id(path, _) => path.join("_"),
                     _ => unreachable!(),
                 };
                 let args = self.to_qbe_args(block, func_id.clone(), args);
@@ -384,6 +417,11 @@ impl QbeBackend {
         }
         new_args
     }
+}
+
+/// Get current block from QBE function
+fn get_block(func: &mut Function) -> &mut Block {
+    func.blocks.last_mut().unwrap()
 }
 
 impl Type {

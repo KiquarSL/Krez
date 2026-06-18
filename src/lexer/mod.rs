@@ -1,7 +1,7 @@
 pub mod std;
 pub mod token;
 
-use crate::session::{source::FileId, Session};
+use crate::session::source::FileId;
 use token::Token;
 
 pub trait Lexer {

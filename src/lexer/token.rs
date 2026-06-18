@@ -173,6 +173,9 @@ pub enum Keyword {
     /// extern
     #[strum(to_string = "extern")]
     Extern,
+    /// extern
+    #[strum(to_string = "export")]
+    Export,
 }
 
 impl PartialEq for Keyword {
