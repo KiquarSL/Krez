@@ -24,6 +24,13 @@ fn main(argc: i32, args: &[string]) i32 {
 	fix j: f32 = 3.14 + 3.0; 
 	
 	println(\"hi\");
+	
+	while 4 < 8 {
+		println(\"87\");
+		while a + 1 < 8 {
+			println(\"0\");
+		}
+	}
 }",
     );
     let mut lx = StdLexer::new(session.clone());

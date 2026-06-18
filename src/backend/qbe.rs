@@ -109,19 +109,19 @@ impl QbeBackend {
                 };
                 let mut func =
                     Function::new(linkable, id, self.to_qbe_func_args(args.to_vec()), ret_ty);
-                let block = func.add_block("start");
+                func.add_block("start");
                 self.push_scope();
-                for stmt in body {
-                    self.gen_body_stmt(&stmt, block);
+                for body_stmt in body {
+                    self.gen_body_stmt(&mut func, &body_stmt);
                 }
                 self.pop_scope();
-                self.module.add_function(func);
+                self.module.add_function(func.clone());
             }
             _ => todo!("{stmt}"),
         }
     }
 
-    fn gen_body_stmt(&mut self, stmt: &Stmt, block: &mut Block) {
+    fn gen_body_stmt(&mut self, func: &mut Function, stmt: &Stmt) {
         match stmt {
             Stmt::Declare(_mut_kind, id, ty, val) => {
                 let instr_alloc = match ty.size(self) {
@@ -130,15 +130,17 @@ impl QbeBackend {
                     (16, n) => Instr::Alloc16(n),
                     _ => unreachable!(),
                 };
+                let block = func.blocks.last_mut().unwrap();
                 block.assign_instr(Value::Temporary(id.clone()), ty.to_qbe(self), instr_alloc);
                 self.push_var(id.clone(), ty.clone());
                 self.gen_body_stmt(
+                    func,
                     &Stmt::Assign(false, id.clone(), AssignOp::default(), val.clone()),
-                    block,
                 );
             }
             Stmt::Assign(_is_deref, id, _assign_op, val) => {
                 let ty = self.var_info(id.clone());
+                let block = func.blocks.last_mut().unwrap();
                 let value = self.gen_expr(val.clone(), block, ty.clone());
                 block.assign_instr(
                     Value::Temporary(id.clone()),
@@ -147,7 +149,28 @@ impl QbeBackend {
                 );
             }
             Stmt::Expr(expr) => {
+                let block = func.blocks.last_mut().unwrap();
                 self.gen_expr(expr.clone(), block, Type::Unknown);
+            }
+            Stmt::While(cond, body) => {
+                let check_label = self.new_label("while_check");
+                let start_label = self.new_label("while_start");
+                let exit_label = self.new_label("while_end");
+
+                let check_block = func.add_block(&check_label);
+                let value = self
+                    .gen_expr(cond.clone(), check_block, Type::Bool(Info::empty()))
+                    .1;
+                check_block.add_instr(Instr::Jnz(value, start_label.clone(), exit_label.clone()));
+                func.add_block(&start_label);
+                for body_stmt in body {
+                    self.gen_body_stmt(func, body_stmt);
+                }
+                func.blocks
+                    .last_mut()
+                    .unwrap()
+                    .add_instr(Instr::Jmp(check_label.clone()));
+                func.add_block(&exit_label);
             }
             _ => todo!("{stmt}"),
         }
@@ -284,7 +307,6 @@ impl QbeBackend {
             Expr::Invalid => {
                 unreachable!("Invalid values cannot be in backend")
             }
-            _ => todo!("{expr}"),
         };
         (tmp, value.0, value.1)
     }
