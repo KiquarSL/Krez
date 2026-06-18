@@ -8,7 +8,7 @@ use crate::parser::{
 use crate::report::{Diagnostic, Level, Phase};
 use crate::session::{Session, source::FileId};
 use crate::{diag, span_type};
-use qbe::{Block, Cmp, Function, Instr, Linkage, Module, Value};
+use qbe::{Block, Cmp, DataDef, DataItem, Function, Instr, Linkage, Module, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -41,14 +41,16 @@ macro_rules! emit_error {
 
 pub struct QbeBackend {
     session: Rc<RefCell<Session>>,
+    file_id: FileId,
     module: Module,
 
-    file_id: FileId,
     label_count: usize,
     tmp_count: usize,
+    lit_count: usize,
 
     scopes: Vec<HashMap<String, Type>>,
     functions: HashMap<String, (Option<Type>, Vec<Type>)>,
+    strings: HashMap<String, String>,
 }
 
 impl QbeBackend {
@@ -59,8 +61,10 @@ impl QbeBackend {
             file_id: 0,
             label_count: 0,
             tmp_count: 0,
+            lit_count: 0,
             scopes: vec![],
             functions: HashMap::new(),
+            strings: HashMap::new(),
         }
     }
 }
@@ -231,7 +235,7 @@ impl QbeBackend {
                 (value, Type::Bool(info))
             }
             Expr::Str(s, info) => {
-                let value = Value::Global(s);
+                let value = Value::Global(self.new_string(&s));
                 (value, Type::Str(info))
             }
             Expr::Arith(left, op, right, _info) => {
@@ -358,6 +362,21 @@ impl QbeBackend {
         let tmp = format!("_tmp_{}", self.tmp_count);
         self.tmp_count += 1;
         tmp
+    }
+
+    fn new_string(&mut self, s: &str) -> String {
+        if self.strings.contains_key(s) {
+            return self.strings.get(s).unwrap().to_string();
+        }
+        let lit = format!("_lit_{}", self.lit_count);
+        self.strings.insert(s.to_string(), lit.clone());
+        let item = (qbe::Type::Byte, DataItem::Str(s.to_string()));
+        let zero = (qbe::Type::Byte, DataItem::Const(0));
+        let items = vec![item, zero];
+        self.module
+            .add_data(DataDef::new(Linkage::private(), &lit, None, items));
+        self.lit_count += 1;
+        lit
     }
 
     fn push_scope(&mut self) {
