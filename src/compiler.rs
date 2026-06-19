@@ -183,6 +183,12 @@ impl FuncInfo {
 
 pub struct KrezCompilerApi<'a> {
     pub ast: &'a mut HashMap<FileId, Vec<Stmt>>,
-    pub session: Rc<RefCell<Session>>,
+    pub session: Rc<RefCell<Session<'a>>>,
     pub modules: &'a mut HashMap<FileId, Module>,
+}
+
+impl KrezCompilerApi<'_> {
+    pub fn push_mod(&mut self, id: FileId, modu: Module) {
+        self.modules.insert(id, modu);
+    }
 }

@@ -2,7 +2,8 @@ pub mod source;
 
 use crate::compiler::Module;
 use crate::report::{Diagnostic, Level, Reporter};
-use source::{Source, SourceMap};
+use source::{FileId, Source, SourceMap};
+use std::collections::HashMap;
 
 pub struct Session<'a> {
     diagnostics: Vec<Diagnostic>,
@@ -26,7 +27,7 @@ impl<'a> Session<'a> {
         }
     }
 
-    pub fn load_modules(&mut self, mods: &'a Vec<Module>) {
+    pub fn load_modules(&mut self, mods: &'a HashMap<FileId, Module>) {
         self.modules = Some(mods);
     }
 
