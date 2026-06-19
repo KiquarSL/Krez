@@ -27,13 +27,14 @@ fn main(argc: i32, args: &[string]) i32 {
 	
 	while 4 < 8 {
 		if a < 9 {
-			println(\"tuda\");
+			continue;
 		} elif a > 9 {
 			println(\"me tuda\");
 		} else {
-			println(\"o net\");
+			break;
 		}
 	}
+	ret 0;
 }",
     );
     let mut lx = StdLexer::new(session.clone());

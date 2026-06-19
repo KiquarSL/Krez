@@ -1,12 +1,12 @@
 use crate::backend::{Backend, BackendOutput};
 use crate::parser::{
-    Info,
     ast::{AssignOp, Stmt},
     expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp},
     types::Type,
+    Info,
 };
 use crate::report::{Diagnostic, Level, Phase};
-use crate::session::{Session, source::FileId};
+use crate::session::{source::FileId, Session};
 use crate::{diag, span_type};
 use qbe::{Block, Cmp, DataDef, DataItem, Function, Instr, Linkage, Module, Value};
 use std::cell::RefCell;
@@ -49,8 +49,12 @@ pub struct QbeBackend {
     lit_count: usize,
 
     scopes: Vec<HashMap<String, Type>>,
+    // last start loop and exit
+    loop_stack: Vec<(String, String)>,
     functions: HashMap<String, (Option<Type>, Vec<Type>)>,
     strings: HashMap<String, String>,
+
+    current_func: String,
 }
 
 impl QbeBackend {
@@ -65,6 +69,8 @@ impl QbeBackend {
             scopes: vec![],
             functions: HashMap::new(),
             strings: HashMap::new(),
+            current_func: String::new(),
+            loop_stack: vec![],
         }
     }
 }
@@ -93,6 +99,7 @@ impl QbeBackend {
     fn gen_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Func(is_exp, _is_pub, id, args, ret_ty, body) => {
+                self.current_func = id.to_string();
                 let linkable = if id == "main" || *is_exp {
                     Linkage::public()
                 } else {
@@ -160,6 +167,9 @@ impl QbeBackend {
                 let start_label = self.new_label("while_start");
                 let exit_label = self.new_label("while_end");
 
+                self.loop_stack
+                    .push((start_label.clone(), exit_label.clone()));
+
                 let check_block = func.add_block(&check_label);
                 let value = self
                     .gen_expr(cond.clone(), check_block, Type::Bool(Info::empty()))
@@ -171,6 +181,8 @@ impl QbeBackend {
                 }
                 get_block(func).add_instr(Instr::Jmp(check_label.clone()));
                 func.add_block(&exit_label);
+
+                self.loop_stack.pop();
             }
             Stmt::IfElse(branches) => {
                 let exit_label = self.new_label("if_exit");
@@ -208,6 +220,35 @@ impl QbeBackend {
                     get_block(func).add_instr(Instr::Jmp(exit_label.clone()));
                 }
                 func.add_block(exit_label);
+            }
+            Stmt::Return(value) => {
+                let result = match value {
+                    None => None,
+                    Some(expr) => {
+                        let ret = self
+                            .gen_expr(
+                                expr.clone(),
+                                get_block(func),
+                                self.functions
+                                    .get(&self.current_func)
+                                    .unwrap()
+                                    .clone()
+                                    .0
+                                    .unwrap(),
+                            )
+                            .1;
+                        Some(ret)
+                    }
+                };
+                get_block(func).add_instr(Instr::Ret(result));
+            }
+            Stmt::Break => {
+                let goto = self.loop_stack.last().unwrap().1.clone();
+                get_block(func).add_instr(Instr::Jmp(goto));
+            }
+            Stmt::Continue => {
+                let goto = self.loop_stack.last().unwrap().0.clone();
+                get_block(func).add_instr(Instr::Jmp(goto));
             }
             _ => todo!("{stmt}"),
         }
