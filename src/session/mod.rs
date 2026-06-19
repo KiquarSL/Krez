@@ -1,18 +1,20 @@
 pub mod source;
 
+use crate::compiler::Module;
 use crate::report::{Diagnostic, Level, Reporter};
 use source::{Source, SourceMap};
 
-pub struct Session {
+pub struct Session<'a> {
     diagnostics: Vec<Diagnostic>,
     source_map: SourceMap,
     reporter: Option<Box<dyn Reporter>>,
     has_error: bool,
+    modules: Option<&'a HashMap<FileId, Module>>,
 
     mangle_func_count: usize,
 }
 
-impl Session {
+impl<'a> Session<'a> {
     pub fn new(reporter: Option<Box<dyn Reporter>>) -> Self {
         Self {
             reporter,
@@ -20,7 +22,12 @@ impl Session {
             diagnostics: vec![],
             has_error: false,
             mangle_func_count: 0,
+            modules: None,
         }
+    }
+
+    pub fn load_modules(&mut self, mods: &'a Vec<Module>) {
+        self.modules = Some(mods);
     }
 
     pub fn new_mangle_func(&mut self) -> usize {

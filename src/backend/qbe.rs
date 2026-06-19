@@ -1,12 +1,12 @@
 use crate::backend::{Backend, BackendOutput};
 use crate::parser::{
-    ast::{AssignOp, Stmt},
+    Info,
     expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp},
     types::Type,
-    Info,
+	ast::{Stmt,AssignOp}
 };
 use crate::report::{Diagnostic, Level, Phase};
-use crate::session::{source::FileId, Session};
+use crate::session::{Session, source::FileId};
 use crate::{diag, span_type};
 use qbe::{Block, Cmp, DataDef, DataItem, Function, Instr, Linkage, Module, Value};
 use std::cell::RefCell;
@@ -26,21 +26,8 @@ macro_rules! emit_error_type {
     };
 }
 
-macro_rules! emit_error {
-    ($self:expr, $expr:expr,$notes:expr, $helps:expr, $($msg:tt)*) => {
-        $self.emit_error(diag!(
-            Level::Error,
-            span!($self.file_id, $expr.line, $expr.offset, $expr.len),
-            Phase::CodeGen,
-            $notes,
-            $helps,
-            $($msg)*
-         ));
-    };
-}
-
-pub struct QbeBackend {
-    session: Rc<RefCell<Session>>,
+pub struct QbeBackend<'a> {
+    session: Rc<RefCell<Session<'a>>>,
     file_id: FileId,
     module: Module,
 
@@ -49,28 +36,33 @@ pub struct QbeBackend {
     lit_count: usize,
 
     scopes: Vec<HashMap<String, Type>>,
-    // last start loop and exit
+    /// last loop start and exit labels
     loop_stack: Vec<(String, String)>,
+    /// Functions id, return type and types of arguments
     functions: HashMap<String, (Option<Type>, Vec<Type>)>,
+    /// String data (str -> literal)
     strings: HashMap<String, String>,
+    /// Uses list for build right function names
+    uses: Vec<Vec<String>>,
 
     current_func: String,
 }
 
-impl QbeBackend {
-    pub fn new(session: Rc<RefCell<Session>>) -> Self {
+impl<'a> QbeBackend<'a> {
+    pub fn new(session: Rc<RefCell<Session<'a>>>) -> Self {
         Self {
             session,
             module: Module::new(),
-            file_id: 0,
+            strings: HashMap::new(),
+            functions: HashMap::new(),
+            current_func: String::new(),
             label_count: 0,
             tmp_count: 0,
             lit_count: 0,
-            scopes: vec![],
-            functions: HashMap::new(),
-            strings: HashMap::new(),
-            current_func: String::new(),
+            file_id: 0,
             loop_stack: vec![],
+            scopes: vec![],
+            uses: vec![],
         }
     }
 }
@@ -127,7 +119,14 @@ impl QbeBackend {
                 self.pop_scope();
                 self.module.add_function(func.clone());
             }
-            _ => todo!("{stmt}"),
+            Stmt::Use(_is_pub, pathes) => {
+                for path in pathes {
+                    self.uses.push(path.to_vec());
+                }
+            }
+            _ => {
+                unreachable!("Other statements should be in function body!")
+            }
         }
     }
 
@@ -250,7 +249,9 @@ impl QbeBackend {
                 let goto = self.loop_stack.last().unwrap().0.clone();
                 get_block(func).add_instr(Instr::Jmp(goto));
             }
-            _ => todo!("{stmt}"),
+            _ => {
+                panic!("Other statements cannot be in function body!")
+            }
         }
     }
 
@@ -367,7 +368,7 @@ impl QbeBackend {
             }
             Expr::Call(id, args, _info) => {
                 let func_id = match *id {
-                    Expr::Id(path, _) => path.join("_"),
+                    Expr::Id(path, _) => self.build_call_id(path),
                     _ => unreachable!(),
                 };
                 let args = self.to_qbe_args(block, func_id.clone(), args);
@@ -471,11 +472,23 @@ impl QbeBackend {
     ) -> Vec<(qbe::Type, Value)> {
         let mut new_args = vec![];
         for (i, expr) in args.iter().enumerate() {
-            let ty = self.functions.get(&id).unwrap().1[i].clone();
+            let ty = self.functions.get(&id).expect(&id).1[i].clone();
             let value = self.gen_expr(expr.clone(), block, ty.clone());
             new_args.push((ty.to_qbe(self), value.1));
         }
         new_args
+    }
+
+    fn build_call_id(&self, path: Vec<String>) -> String {
+        for use_loc in &self.uses {
+            if use_loc.last() == path.first() {
+                let full = use_loc
+                    .join("_")
+                    .push_str(&("_".to_owned() + &path[1..].join("_")));
+                full
+            }
+        }
+        path.join("_")
     }
 }
 

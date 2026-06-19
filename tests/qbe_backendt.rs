@@ -13,7 +13,7 @@ fn test_qbe() {
     let session = Rc::new(RefCell::new(Session::new(Some(reporter))));
     let file_id = session.borrow_mut().source_map_mut().add(
         "test.kz",
-        "
+        "	
 fn println(s: string) {
 	// it not implenented :/
 }
@@ -22,8 +22,6 @@ fn main(argc: i32, args: &[string]) i32 {
 	fix a: i32 = 2 + 2 * 2;
 	mut z: bool = !true;
 	fix j: f32 = 3.14 + 3.0; 
-	
-	println(\"hi\");
 	
 	while 4 < 8 {
 		if a < 9 {
@@ -61,16 +59,15 @@ fn test_qbe_err() {
     let file_id = session.borrow_mut().source_map_mut().add(
         "test.kz",
         "
-fn println(s: string) {
-	// it not implenented :/
-}		
+
+use std::io;
 		
 fn main(argc: i32, args: &[string]) i32 {
 	fix a: i32 = 3.15 + 2;
 	fix z: bool = true;
 	fix j: f32 = 3.14 + z + r; 
 	
-	println(\"Err here -->\")
+	io::println(\"Err here -->\") // undeclared func
 }",
     );
     let mut lx = StdLexer::new(session.clone());

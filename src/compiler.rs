@@ -13,11 +13,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-pub struct KrezCompiler {
+pub struct KrezCompiler<'a> {
     lexer: Box<dyn Lexer>,
     parser: Box<dyn Parser>,
     backend: Box<dyn Backend>,
-    session: Rc<RefCell<Session>>,
+    session: Rc<RefCell<Session<'a>>>,
     build_dir: String,
 
     ast: HashMap<FileId, Vec<Stmt>>,
@@ -25,7 +25,7 @@ pub struct KrezCompiler {
     plugins: Vec<Box<dyn Plugin>>,
 }
 
-impl KrezCompiler {
+impl KrezCompiler<'a> {
     pub fn new(
         lexer: Box<dyn Lexer>,
         parser: Box<dyn Parser>,
@@ -106,6 +106,7 @@ impl KrezCompiler {
             session.show_errors();
             return Ok(());
         }
+        self.session.borrow_mut().load_modules(&self.modules);
         let root = self.find_root_path();
 
         let session = self.session.borrow();
