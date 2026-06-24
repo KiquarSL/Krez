@@ -1,6 +1,6 @@
 use super::{
     Parser,
-    ast::{AssignOp, MutKind, Stmt},
+    ast::{AssignOp, Extern, MutKind, Stmt},
     expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp},
     types::Type,
 };
@@ -10,6 +10,7 @@ use crate::session::{Session, source::FileId};
 use crate::{diag, help, info, span};
 use std::cell::RefCell;
 use std::rc::Rc;
+
 macro_rules! emit_error {
     ($self:expr, $token:expr,$notes:expr, $helps:expr, $($msg:tt)*) => {
         $self.emit_error(diag!(
@@ -23,14 +24,14 @@ macro_rules! emit_error {
     };
 }
 
-pub struct StdParser {
+pub struct StdParser<'a> {
     tokens: Vec<Token>,
     index: usize,
-    session: Rc<RefCell<Session>>,
+    session: Rc<RefCell<Session<'a>>>,
     file_id: FileId,
 }
 
-impl Parser for StdParser {
+impl Parser for StdParser<'_> {
     fn parse(&mut self, tokens: Vec<Token>, file_id: FileId) -> Vec<Stmt> {
         self.file_id = file_id;
         self.tokens = tokens;
@@ -47,8 +48,8 @@ impl Parser for StdParser {
     }
 }
 
-impl StdParser {
-    pub fn new(session: Rc<RefCell<Session>>) -> Self {
+impl<'a> StdParser<'a> {
+    pub fn new(session: Rc<RefCell<Session<'a>>>) -> Self {
         Self {
             index: 0,
             session,
@@ -57,7 +58,11 @@ impl StdParser {
         }
     }
 
-    pub fn new_full(session: Rc<RefCell<Session>>, tokens: Vec<Token>, file_id: FileId) -> Self {
+    pub fn new_full(
+        session: Rc<RefCell<Session<'a>>>,
+        tokens: Vec<Token>,
+        file_id: FileId,
+    ) -> Self {
         Self {
             index: 0,
             session,
@@ -270,9 +275,78 @@ impl StdParser {
     fn emit_error(&mut self, diag: Diagnostic) {
         self.session.borrow_mut().emit_error(diag);
     }
+
+    fn parse_func_header(&mut self) -> (String, Vec<(String, Type)>, Option<Type>) {
+        let id = self.peek(0);
+        let id = match id.kind {
+            TKind::Id(id) => {
+                self.advance(1);
+                id
+            }
+            _ => {
+                emit_error!(
+                    self,
+                    id,
+                    vec![],
+                    vec![help!(
+                        span!(self.file_id, id.line, id.offset, 0),
+                        "func_name",
+                        false,
+                        "Add function identificator here"
+                    )],
+                    "Expected identificator, found {id}"
+                );
+                "INVALID_IDENT".to_string()
+            }
+        };
+        if !self.check(TKind::LParen) {
+            let lparen = self.peek(0);
+            emit_error!(
+                self,
+                lparen,
+                vec![],
+                vec![help!(
+                    span!(self.file_id, lparen.line, lparen.offset, 0),
+                    "(",
+                    false,
+                    "Add '(' here"
+                )],
+                "Expected '(', found {}",
+                lparen
+            );
+        }
+        let args = if self.check(TKind::RParen) {
+            vec![]
+        } else {
+            let ags = self.parse_fn_args();
+            if !self.check(TKind::RParen) {
+                let rparen = self.peek(0);
+                emit_error!(
+                    self,
+                    rparen,
+                    vec![],
+                    vec![help!(
+                        span!(self.file_id, rparen.line, rparen.offset, 0),
+                        ")",
+                        false,
+                        "Add ')' here"
+                    )],
+                    "Expected ')', found {}",
+                    rparen
+                );
+            }
+            ags
+        };
+        let ret_ty = if self.multi_check(&[TKind::Semicolon, TKind::RBrace]) {
+            Some(self.parse_type())
+        } else {
+            None
+        };
+        (id, args, ret_ty)
+    }
 }
 
-impl StdParser {
+impl StdParser<'_> {
     pub fn expr(&mut self) -> Result<Expr, ()> {
         Ok(self.logical()?)
     }
@@ -446,6 +520,7 @@ enum StmtKind {
     Continue,
     Expr,
     Use,
+    Extern,
 }
 
 fn define(pr: &StdParser) -> StmtKind {
@@ -454,6 +529,7 @@ fn define(pr: &StdParser) -> StmtKind {
 
     match (token.kind, next_token.kind) {
         (TKind::Keyword(Keyword::Fix | Keyword::Mut), _) => StmtKind::Declare,
+        (TKind::Keyword(Keyword::Extern), _) => StmtKind::Extern,
         (TKind::Keyword(Keyword::If), _) => StmtKind::IfElse,
         (TKind::Keyword(Keyword::Ret), _) => StmtKind::Return,
         (TKind::Keyword(Keyword::Fn), _)
@@ -479,7 +555,7 @@ fn define(pr: &StdParser) -> StmtKind {
     }
 }
 
-impl StdParser {
+impl<'a> StdParser<'a> {
     pub fn stmt(&mut self) -> Result<Stmt, ()> {
         Ok(match define(self) {
             StmtKind::Expr => self.stmt_expr(),
@@ -491,7 +567,58 @@ impl StdParser {
             StmtKind::Break | StmtKind::Continue => self.stmt_break_continue(),
             StmtKind::While => self.stmt_while_loop(),
             StmtKind::Use => self.stmt_use(),
+            StmtKind::Extern => self.stmt_extern(),
         })
+    }
+
+    fn stmt_extern(&mut self) -> Stmt {
+        self.advance(1);
+        if !self.check(TKind::LBrace) {
+            let lbrace = self.peek(0);
+            emit_error!(
+                self,
+                lbrace,
+                vec![],
+                vec![help!(
+                    span!(self.file_id, lbrace.line, lbrace.offset, 0),
+                    "{",
+                    false,
+                    "Add '{{' here"
+                )],
+                "Expected '{{', found {}",
+                lbrace
+            );
+            return Stmt::Extern(vec![]);
+        }
+        let mut externs = vec![];
+        while self.peek(0).kind != TKind::RBrace {
+            if self.peek(0).kind == TKind::Keyword(Keyword::Fn) {
+                let func_header = self.parse_func_header();
+                externs.push(Extern::Func(func_header.0, func_header.1, func_header.2));
+            } else {
+                self.skip_until(&[TKind::RBrace]);
+                self.advance(1);
+                break;
+            }
+            if !self.check(TKind::Semicolon) {
+                let semicolon = self.peek(0);
+                let new = self.back_peek(1);
+                emit_error!(
+                    self,
+                    semicolon,
+                    vec![],
+                    vec![help!(
+                        span!(self.file_id, new.line, new.offset + new.len, 0),
+                        ";",
+                        false,
+                        "Add ';' here"
+                    )],
+                    "Expected ';', found {}",
+                    semicolon
+                );
+            }
+        }
+        return Stmt::Extern(externs);
     }
 
     fn stmt_expr(&mut self) -> Stmt {
@@ -944,70 +1071,7 @@ impl StdParser {
             false
         };
         self.advance(1);
-        let id = self.peek(0);
-        let id = match id.kind {
-            TKind::Id(id) => {
-                self.advance(1);
-                id
-            }
-            _ => {
-                emit_error!(
-                    self,
-                    id,
-                    vec![],
-                    vec![help!(
-                        span!(self.file_id, id.line, id.offset, 0),
-                        "func_name",
-                        false,
-                        "Add function identificator here"
-                    )],
-                    "Expected identificator, found {id}"
-                );
-                "INVALID_IDENT".to_string()
-            }
-        };
-        if !self.check(TKind::LParen) {
-            let lparen = self.peek(0);
-            emit_error!(
-                self,
-                lparen,
-                vec![],
-                vec![help!(
-                    span!(self.file_id, lparen.line, lparen.offset, 0),
-                    "(",
-                    false,
-                    "Add '(' here"
-                )],
-                "Expected '(', found {}",
-                lparen
-            );
-        }
-        let args = if self.check(TKind::RParen) {
-            vec![]
-        } else {
-            let ags = self.parse_fn_args();
-            if !self.check(TKind::RParen) {
-                let rparen = self.peek(0);
-                emit_error!(
-                    self,
-                    rparen,
-                    vec![],
-                    vec![help!(
-                        span!(self.file_id, rparen.line, rparen.offset, 0),
-                        ")",
-                        false,
-                        "Add ')' here"
-                    )],
-                    "Expected ')', found {}",
-                    rparen
-                );
-            }
-            ags
-        };
-        let mut ret_ty = None;
-        if self.peek(0).kind != TKind::LBrace {
-            ret_ty = Some(self.parse_type());
-        }
+        let header = self.parse_func_header();
         if !self.check(TKind::LBrace) {
             let lbrace = self.peek(0);
             emit_error!(
@@ -1041,6 +1105,6 @@ impl StdParser {
                 rbrace
             );
         }
-        Stmt::Func(is_exp, is_pub, id, args, ret_ty, body)
+        Stmt::Func(is_exp, is_pub, header.0, header.1, header.2, body)
     }
 }

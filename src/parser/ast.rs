@@ -50,6 +50,8 @@ pub enum Stmt {
     3. Pathes (a::b::c, a::b::d)
     */
     Use(bool, Vec<Vec<String>>),
+    /// Keep extern type
+    Extern(Vec<Extern>),
     /// Keep return value of None
     Return(Option<Expr>),
     /// Call functions and other expressions
@@ -149,9 +151,15 @@ impl fmt::Display for Stmt {
                     .collect::<Vec<_>>()
                     .join("\n"),
             ),
+            _ => todo!(),
         };
         write!(f, "{s}")
     }
+}
+
+#[derive(Debug)]
+pub enum Extern {
+    Func(String, Vec<(String, Type)>, Option<Type>),
 }
 
 /// Variable muttable type

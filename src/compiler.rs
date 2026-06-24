@@ -25,12 +25,12 @@ pub struct KrezCompiler<'a> {
     plugins: Vec<Box<dyn Plugin>>,
 }
 
-impl KrezCompiler<'a> {
+impl<'a> KrezCompiler<'a> {
     pub fn new(
         lexer: Box<dyn Lexer>,
         parser: Box<dyn Parser>,
         backend: Box<dyn Backend>,
-        session: Rc<RefCell<Session>>,
+        session: Rc<RefCell<Session<'a>>>,
         build_dir: String,
         plugins: Vec<Box<dyn Plugin>>,
     ) -> Self {
@@ -48,7 +48,8 @@ impl KrezCompiler<'a> {
 
     pub fn default(build_dir: String, verbose: Verbose) -> Self {
         let reporter = StdReporter::new(verbose);
-        let session = Rc::new(RefCell::new(Session::new(Some(Box::new(reporter)))));
+        let session: Rc<RefCell<Session<'a>>> =
+            Rc::new(RefCell::new(Session::new(Some(Box::new(reporter)))));
 
         let lexer = StdLexer::new(session.clone());
         let parser = StdParser::new(session.clone());
@@ -93,14 +94,23 @@ impl KrezCompiler<'a> {
                 return Ok(());
             }
         }
+
+        let mut ast = std::mem::take(&mut self.ast);
+        let mut modules = std::mem::take(&mut self.modules);
+
         let mut api = KrezCompilerApi {
             session: self.session.clone(),
-            ast: &mut self.ast,
-            modules: &mut self.modules,
+            ast: &mut ast,
+            modules: &mut modules,
         };
+
         for plugin in &mut self.plugins {
             plugin.run(&mut api);
         }
+
+        self.ast = ast;
+        self.modules = modules;
+
         let session = self.session.borrow();
         if session.has_error() {
             session.show_errors();

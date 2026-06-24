@@ -1,5 +1,0 @@
-use some::some;
-
-fn main() {
-    fix a: i32 = some::func();
-}

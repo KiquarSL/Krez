@@ -1,3 +1,0 @@
-pub fn func() -> i32 {
-    ret 0;
-}

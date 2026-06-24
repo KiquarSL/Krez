@@ -1,9 +1,9 @@
 use crate::backend::{Backend, BackendOutput};
 use crate::parser::{
     Info,
+    ast::{AssignOp, Stmt},
     expr::{ArithOp, CompOp, Expr, LogicOp, UnaryOp},
     types::Type,
-	ast::{Stmt,AssignOp}
 };
 use crate::report::{Diagnostic, Level, Phase};
 use crate::session::{Session, source::FileId};
@@ -67,7 +67,7 @@ impl<'a> QbeBackend<'a> {
     }
 }
 
-impl Backend for QbeBackend {
+impl Backend for QbeBackend<'_> {
     fn compile(&mut self, file_id: FileId, ast: &[Stmt]) -> BackendOutput {
         self.file_id = file_id;
         self.functions.clear();
@@ -87,7 +87,7 @@ impl Backend for QbeBackend {
     }
 }
 
-impl QbeBackend {
+impl QbeBackend<'_> {
     fn gen_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Func(is_exp, _is_pub, id, args, ret_ty, body) => {

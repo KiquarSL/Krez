@@ -12,6 +12,7 @@ use std::cell::Ref;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
+
 macro_rules! double_token {
     ($self:expr, $second:expr, $then:ident, $else:ident) => {
         if $self.peek(1) == Some($second) {
@@ -51,18 +52,18 @@ macro_rules! only_double_token {
     };
 }
 
-pub struct StdLexer {
+pub struct StdLexer<'a> {
     pos: usize,
     file_id: FileId,
     tokens: Vec<Token>,
-    session: Rc<RefCell<Session>>,
+    session: Rc<RefCell<Session<'a>>>,
     chars: Vec<char>,
 
     line: usize,
     offset: usize,
 }
 
-impl Lexer for StdLexer {
+impl Lexer for StdLexer<'_> {
     fn tokenize(&mut self, file_id: FileId) -> Vec<Token> {
         self.file_id = file_id;
         let src_text = self.src().text.clone();
@@ -239,8 +240,8 @@ impl Lexer for StdLexer {
     }
 }
 
-impl StdLexer {
-    pub fn new(session: Rc<RefCell<Session>>) -> Self {
+impl<'a> StdLexer<'a> {
+    pub fn new(session: Rc<RefCell<Session<'a>>>) -> Self {
         Self {
             file_id: 0,
             pos: 0,
